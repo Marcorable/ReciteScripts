@@ -1,0 +1,67 @@
+# ── 시크릿 (Public 레포 — 절대 커밋 금지) ──────────────────────────
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+*.certSigningRequest
+.env
+.env.*
+fastlane/.env*
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+GoogleService-Info.plist
+*Secrets*.xcconfig
+*secrets*.xcconfig
+*.keystore
+AuthKey_*.p8
+
+# ── Xcode ─────────────────────────────────────────────────────────
+build/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+timeline.xctimeline
+playground.xcworkspace
+*.xcresult
+
+# ── Swift Package Manager ─────────────────────────────────────────
+.build/
+.swiftpm/
+Packages/
+Package.resolved.lock
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+# ── 도구 캐시 ──────────────────────────────────────────────────────
+.tuist/
+Derived/
+Tuist/.build/
+.mint/
+.bundle/
+vendor/bundle/
+Pods/
+
+# ── 에이전트 로컬 설정 (개인 설정은 커밋하지 않음) ─────────────────
+.claude/settings.local.json
+.codex/
+.orca/
+
+# ── macOS / 에디터 ─────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.idea/
+.vscode/
+*.swp
+*.swo
