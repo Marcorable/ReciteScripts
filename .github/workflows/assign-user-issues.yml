@@ -1,0 +1,23 @@
+name: Assign user issues
+
+on:
+  issues:
+    types:
+      - opened
+      - labeled
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  assign-marco:
+    if: contains(github.event.issue.labels.*.name, 'user')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign issue to Marco
+        run: gh issue edit "$ISSUE_NUMBER" --add-assignee Marcorable
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}

@@ -24,7 +24,7 @@
 
 ## 하지 않는 일
 
-- App Store Connect에 직접 제출·업로드 (계정 작업은 `needs-marco`).
+- App Store Connect에 직접 제출·업로드 (계정 작업은 `user`).
 - 개발자 계정 정보·결제 정보를 문서에 적는 것.
 
 ## 산출물
