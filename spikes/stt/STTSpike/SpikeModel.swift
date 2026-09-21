@@ -25,7 +25,8 @@ final class SpikeModel {
 
     // 설정
     var script: SampleScript = SampleScript.all[0] { didSet { resetSession() } }
-    var useFastResults = false
+    /// Mac TTS 검증 결과: 끄면 임시 결과가 ~11초 단위로 묶여 온다. 실시간 추적에는 필수 (docs/log/stt-spike.md).
+    var useFastResults = true
     var useContextualWords = false
     var maxDistance: Double = 0.45 { didSet { resetSession() } }
 

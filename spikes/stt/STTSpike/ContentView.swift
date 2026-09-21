@@ -90,7 +90,8 @@ struct ContentView: View {
             Text("전사")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("\(model.finalizedText.suffix(60))\(Text(model.volatileText).foregroundStyle(.secondary))")
+            // 임시 결과는 미확정 구간 전체라 길어질 수 있다. 끝부분만 보여 준다.
+            Text("\(model.finalizedText.suffix(40))\(Text(model.volatileText.suffix(80)).foregroundStyle(.secondary))")
                 .font(.body)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
