@@ -21,17 +21,26 @@ public struct CursorMatcher: Sendable {
         public var minimumLookaheadTokens: Int
         /// 발화 자모 수가 이보다 적으면 매칭하지 않는다(짧은 잡음으로 커서가 튀는 것을 막는다).
         public var minimumHypothesisUnits: Int
+        /// 앵커 이후 이만큼의 어절은 건너뛰고 시작하는 것을 허용한다.
+        /// 중간부터 읽거나 한 줄을 빼먹었을 때 커서가 오래 멈추는 것을 막는다(실기기 관찰: 5어절 건너뛰자 14어절 동안 정지).
+        public var maxSkipTokens: Int
+        /// 건너뛴 매칭은 건너뛰지 않은 매칭보다 이만큼 더 좋아야 채택한다(동률이면 건너뛰지 않는 쪽).
+        public var skipPenalty: Double
 
         public init(
             maxNormalizedDistance: Double = 0.45,
             lookaheadRatio: Double = 1.6,
             minimumLookaheadTokens: Int = 4,
-            minimumHypothesisUnits: Int = 3
+            minimumHypothesisUnits: Int = 3,
+            maxSkipTokens: Int = 6,
+            skipPenalty: Double = 0.05
         ) {
             self.maxNormalizedDistance = maxNormalizedDistance
             self.lookaheadRatio = lookaheadRatio
             self.minimumLookaheadTokens = minimumLookaheadTokens
             self.minimumHypothesisUnits = minimumHypothesisUnits
+            self.maxSkipTokens = maxSkipTokens
+            self.skipPenalty = skipPenalty
         }
     }
 
@@ -39,6 +48,8 @@ public struct CursorMatcher: Sendable {
         /// 매칭된 마지막 어절 다음 인덱스. 즉 `tokens[..<cursor]`를 읽은 것으로 본다.
         public let cursor: Int
         public let normalizedDistance: Double
+        /// 앵커에서 건너뛴 어절 수. 0이면 앵커 바로 다음부터 읽은 것이다.
+        public let skippedTokens: Int
     }
 
     public let tokens: [ScriptToken]
@@ -60,15 +71,32 @@ public struct CursorMatcher: Sendable {
         guard hypothesisUnits.count >= configuration.minimumHypothesisUnits else { return nil }
         guard anchor < tokens.count else { return nil }
 
-        // 앵커 이후 어절을 발화 길이의 lookaheadRatio 배까지만 이어 붙인다.
+        var best: Match?
+        for skipped in 0...configuration.maxSkipTokens {
+            let start = anchor + skipped
+            guard start < tokens.count else { break }
+            guard let candidate = alignFrom(start: start, skipped: skipped, hypothesisUnits: hypothesisUnits) else { continue }
+            // 건너뛴 매칭은 페널티를 얹어 비교한다. 같은 품질이면 건너뛰지 않은 쪽이 이긴다.
+            let candidateScore = candidate.normalizedDistance + (skipped > 0 ? configuration.skipPenalty : 0)
+            let bestScore = best.map { $0.normalizedDistance + ($0.skippedTokens > 0 ? configuration.skipPenalty : 0) }
+            if bestScore == nil || candidateScore < bestScore! {
+                best = candidate
+            }
+        }
+        guard let best, best.normalizedDistance <= configuration.maxNormalizedDistance else { return nil }
+        return best
+    }
+
+    /// `start` 어절부터 발화 길이의 lookaheadRatio 배까지 이어 붙여 정렬하고, 가장 좋은 어절 경계를 고른다.
+    private func alignFrom(start: Int, skipped: Int, hypothesisUnits: [Unicode.Scalar]) -> Match? {
         let unitBudget = Int(Double(hypothesisUnits.count) * configuration.lookaheadRatio)
         var scriptUnits: [Unicode.Scalar] = []
         var boundaries: [(tokenEnd: Int, unitEnd: Int)] = []
-        var index = anchor
+        var index = start
         while index < tokens.count {
             let token = tokens[index]
             let withinBudget = scriptUnits.count + token.units.count <= unitBudget
-            let withinMinimum = index - anchor < configuration.minimumLookaheadTokens
+            let withinMinimum = index - start < configuration.minimumLookaheadTokens
             guard withinBudget || withinMinimum else { break }
             scriptUnits.append(contentsOf: token.units)
             boundaries.append((tokenEnd: index + 1, unitEnd: scriptUnits.count))
@@ -84,10 +112,9 @@ public struct CursorMatcher: Sendable {
             let length = Double(max(hypothesisUnits.count, boundary.unitEnd))
             let normalized = distance / length
             if best == nil || normalized < best!.normalizedDistance {
-                best = Match(cursor: boundary.tokenEnd, normalizedDistance: normalized)
+                best = Match(cursor: boundary.tokenEnd, normalizedDistance: normalized, skippedTokens: skipped)
             }
         }
-        guard let best, best.normalizedDistance <= configuration.maxNormalizedDistance else { return nil }
         return best
     }
 }

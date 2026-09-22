@@ -54,4 +54,32 @@ struct CursorMatcherTests {
         let match = matcher.match(hypothesis: "오늘 아침에는 창", anchor: 0)
         #expect(match?.cursor == 2)
     }
+
+    // MARK: 건너뛰기
+
+    @Test func startsMidScriptWithinSkipWindow() {
+        let matcher = CursorMatcher(script: script)
+        // 앞 두 어절을 건너뛰고 "창문을 열고"부터 읽기 시작.
+        let match = matcher.match(hypothesis: "창문을 열고 바깥", anchor: 0)
+        #expect(match?.cursor == 5)
+        #expect(match?.skippedTokens == 2)
+    }
+
+    @Test func prefersNoSkipOnTie() {
+        let matcher = CursorMatcher(script: "가나다 가나다 가나다 라마바")
+        let match = matcher.match(hypothesis: "가나다", anchor: 0)
+        #expect(match?.cursor == 1)
+        #expect(match?.skippedTokens == 0)
+    }
+
+    @Test func doesNotSkipBeyondWindow() {
+        let matcher = CursorMatcher(script: script, configuration: .init(maxSkipTokens: 2))
+        // 5어절 건너뛴 "천천히 마셨다"는 창 밖이라 매칭되지 않는다.
+        #expect(matcher.match(hypothesis: "천천히 마셨다", anchor: 0) == nil)
+    }
+
+    @Test func skipStillRejectsUnrelatedSpeech() {
+        let matcher = CursorMatcher(script: script)
+        #expect(matcher.match(hypothesis: "점심 메뉴는 뭘로 할까 고민이다", anchor: 0) == nil)
+    }
 }

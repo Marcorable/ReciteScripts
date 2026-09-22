@@ -31,6 +31,8 @@ final class SpikeModel {
     /// SpeechTranscriber가 가능한 기기에서도 받아쓰기 모델과 비교하고 싶을 때 켠다. 불가 기기에서는 자동 폴백.
     var preferDictation = false
     var maxDistance: Double = 0.45 { didSet { resetSession() } }
+    /// 프롬프터 방식: 방금 읽은 어절 대신 **다음에 읽을 어절**을 강조한다. 매칭 지연 체감을 줄이는지 본다.
+    var highlightNextToken = false
 
     // 상태
     private(set) var session: ReadingSession
@@ -59,12 +61,20 @@ final class SpikeModel {
 
     var finalCount: Int { results.filter(\.isFinal).count }
     var volatileCount: Int { results.count - finalCount }
-    var averageLag: Double? {
-        guard !results.isEmpty else { return nil }
-        return results.map(\.lag).reduce(0, +) / Double(results.count)
+    /// 임시 결과의 `range.end`는 단어 끝이 아니라 투입한 오디오 끝이라 지연 측정에 못 쓴다.
+    /// 대신 임시 결과 사이 간격(갱신 주기)과, 확정 결과의 (투입 오디오 − 구간 끝) 지연을 본다.
+    var averageUpdateInterval: Double? {
+        let times = results.filter { !$0.isFinal }.map(\.receivedAt)
+        guard times.count >= 2 else { return nil }
+        let intervals = zip(times.dropFirst(), times).map { $0.timeIntervalSince($1) }
+        return intervals.reduce(0, +) / Double(intervals.count)
     }
-    var maxLag: Double? { results.map(\.lag).max() }
-    var lastVolatileLag: Double? { results.last(where: { !$0.isFinal })?.lag }
+    var averageFinalLag: Double? {
+        let lags = results.filter(\.isFinal).map(\.lag)
+        guard !lags.isEmpty else { return nil }
+        return lags.reduce(0, +) / Double(lags.count)
+    }
+    var maxFinalLag: Double? { results.filter(\.isFinal).map(\.lag).max() }
 
     // MARK: - 동작
 
@@ -107,7 +117,7 @@ final class SpikeModel {
         self.pipeline = pipeline
         isRunning = true
         startedAt = .now
-        append("시작 — fastResults=\(useFastResults) 힌트=\(useContextualWords) 받아쓰기=\(preferDictation) 임계값=\(maxDistance)")
+        append("시작 — fastResults=\(useFastResults) 힌트=\(useContextualWords) 받아쓰기=\(preferDictation) 다음어절강조=\(highlightNextToken) 임계값=\(maxDistance)")
 
         eventTask = Task { [weak self] in
             for await event in events {
@@ -172,6 +182,7 @@ final class SpikeModel {
     }
 
     private func append(_ message: String) {
+        print("[spike] \(message)")
         log.append(LogEntry(time: .now, message: message))
         if log.count > 300 { log.removeFirst(log.count - 300) }
     }
@@ -185,7 +196,7 @@ final class SpikeModel {
         fastResults: \(useFastResults) / 힌트: \(useContextualWords) / 받아쓰기: \(preferDictation) / 임계값: \(maxDistance)
         \(localeReport)
         \(formatReport)
-        결과 \(results.count)개 (확정 \(finalCount), 임시 \(volatileCount)), 평균 지연 \(averageLag.map { String(format: "%.2fs", $0) } ?? "-"), 최대 \(maxLag.map { String(format: "%.2fs", $0) } ?? "-")
+        결과 \(results.count)개 (확정 \(finalCount), 임시 \(volatileCount)), 임시 갱신 주기 \(averageUpdateInterval.map { String(format: "%.2fs", $0) } ?? "-"), 확정 지연 평균 \(averageFinalLag.map { String(format: "%.2fs", $0) } ?? "-") 최대 \(maxFinalLag.map { String(format: "%.2fs", $0) } ?? "-")
         커서 \(session.cursor)/\(session.tokens.count)
 
         """

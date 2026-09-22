@@ -70,7 +70,7 @@ struct ContentView: View {
             ScrollView {
                 FlowLayout {
                     ForEach(model.session.tokens, id: \.index) { token in
-                        TokenView(token: token, cursor: model.session.cursor)
+                        TokenView(token: token, state: tokenState(for: token.index))
                             .id(token.index)
                     }
                 }
@@ -83,6 +83,14 @@ struct ContentView: View {
                 withAnimation { proxy.scrollTo(cursor - 1, anchor: .center) }
             }
         }
+    }
+
+    /// 커서 앞은 읽은 것. 강조 위치는 토글에 따라 "방금 읽은 어절"(cursor-1) 또는 "다음 어절"(cursor).
+    private func tokenState(for index: Int) -> TokenState {
+        let cursor = model.session.cursor
+        let current = model.highlightNextToken ? cursor : cursor - 1
+        if index == current { return .current }
+        return index < cursor ? .done : .upcoming
     }
 
     private var transcriptView: some View {
@@ -104,8 +112,8 @@ struct ContentView: View {
         HStack {
             metric("커서", "\(model.session.cursor)/\(model.session.tokens.count)")
             metric("결과", "\(model.finalCount)확정 \(model.volatileCount)임시")
-            metric("지연 평균", model.averageLag.map { String(format: "%.2fs", $0) } ?? "-")
-            metric("최대", model.maxLag.map { String(format: "%.2fs", $0) } ?? "-")
+            metric("갱신 주기", model.averageUpdateInterval.map { String(format: "%.2fs", $0) } ?? "-")
+            metric("확정 지연", model.averageFinalLag.map { String(format: "%.2fs", $0) } ?? "-")
         }
         .font(.caption)
     }
@@ -127,6 +135,8 @@ struct ContentView: View {
             }
             .font(.footnote)
             .disabled(model.isRunning)
+            Toggle("다음 어절 강조 (프롬프터 방식)", isOn: $model.highlightNextToken)
+                .font(.footnote)
             HStack {
                 Text("임계값 \(model.maxDistance, format: .number.precision(.fractionLength(2)))")
                     .font(.footnote)
@@ -151,24 +161,24 @@ struct ContentView: View {
     }
 }
 
-/// 어절 하나. 읽은 것은 흐리게, 방금 읽은 것은 노란 배경, 아직 안 읽은 것은 기본.
+private enum TokenState { case done, current, upcoming }
+
+/// 어절 하나. 읽은 것은 흐리게, 강조 어절은 노란 배경, 아직 안 읽은 것은 기본.
+/// 입력을 enum으로 받아 커서가 움직여도 상태가 바뀐 2개만 body를 다시 그린다.
 private struct TokenView: View {
     let token: ScriptToken
-    let cursor: Int
+    let state: TokenState
 
     var body: some View {
         Text(token.text)
             .font(.title2)
-            .fontWeight(isCurrent ? .bold : .regular)
-            .foregroundStyle(isDone ? .secondary : .primary)
+            .fontWeight(state == .current ? .bold : .regular)
+            .foregroundStyle(state == .done ? .secondary : .primary)
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
-            .background(isCurrent ? Color.yellow.opacity(0.6) : .clear, in: RoundedRectangle(cornerRadius: 6))
-            .accessibilityLabel(isCurrent ? "현재 어절 \(token.text)" : token.text)
+            .background(state == .current ? Color.yellow.opacity(0.6) : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .accessibilityLabel(state == .current ? "현재 어절 \(token.text)" : token.text)
     }
-
-    private var isDone: Bool { token.index < cursor - 1 }
-    private var isCurrent: Bool { token.index == cursor - 1 }
 }
 
 private struct LogSheet: View {

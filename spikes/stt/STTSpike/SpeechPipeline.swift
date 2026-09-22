@@ -49,6 +49,10 @@ actor SpeechPipeline {
 
     static func localeReport(for locale: Locale) async -> String {
         var lines: [String] = []
+        print("[spike] SpeechTranscriber.isAvailable=\(SpeechTranscriber.isAvailable)")
+        print("[spike] SpeechTranscriber.supportedLocales=\(await SpeechTranscriber.supportedLocales.map(\.identifier))")
+        print("[spike] DictationTranscriber.supportedLocales=\(await DictationTranscriber.supportedLocales.map(\.identifier))")
+        print("[spike] Locale.current=\(Locale.current.identifier) preferred=\(Locale.preferredLanguages)")
         if SpeechTranscriber.isAvailable {
             let supported = await SpeechTranscriber.supportedLocales.map(\.identifier).sorted()
             let installed = await SpeechTranscriber.installedLocales.map(\.identifier)
@@ -74,8 +78,9 @@ actor SpeechPipeline {
         let module = try await makeModule()
         try await ensureAssets(for: module.speechModule)
 
+        // `.record` + `.spokenAudio` 조합은 iOS에서 OSStatus -50(paramErr)으로 거부된다. Apple 샘플과 같이 `.playAndRecord`를 쓴다.
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .spokenAudio, options: [])
+        try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker])
         try session.setActive(true)
 
         let analyzer = SpeechAnalyzer(modules: [module.speechModule])
