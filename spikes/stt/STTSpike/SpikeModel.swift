@@ -28,6 +28,8 @@ final class SpikeModel {
     /// Mac TTS 검증 결과: 끄면 임시 결과가 ~11초 단위로 묶여 온다. 실시간 추적에는 필수 (docs/log/stt-spike.md).
     var useFastResults = true
     var useContextualWords = false
+    /// SpeechTranscriber가 가능한 기기에서도 받아쓰기 모델과 비교하고 싶을 때 켠다. 불가 기기에서는 자동 폴백.
+    var preferDictation = false
     var maxDistance: Double = 0.45 { didSet { resetSession() } }
 
     // 상태
@@ -97,6 +99,7 @@ final class SpikeModel {
         let (events, continuation) = AsyncStream.makeStream(of: PipelineEvent.self)
         var options = SpeechPipeline.Options()
         options.fastResults = useFastResults
+        options.preferDictation = preferDictation
         if useContextualWords {
             options.contextualWords = Array(Set(session.tokens.map(\.text)))
         }
@@ -104,7 +107,7 @@ final class SpikeModel {
         self.pipeline = pipeline
         isRunning = true
         startedAt = .now
-        append("시작 — fastResults=\(useFastResults) 힌트=\(useContextualWords) 임계값=\(maxDistance)")
+        append("시작 — fastResults=\(useFastResults) 힌트=\(useContextualWords) 받아쓰기=\(preferDictation) 임계값=\(maxDistance)")
 
         eventTask = Task { [weak self] in
             for await event in events {
@@ -179,7 +182,7 @@ final class SpikeModel {
         formatter.dateFormat = "HH:mm:ss.SSS"
         let header = """
         대본: \(script.title)
-        fastResults: \(useFastResults) / 힌트: \(useContextualWords) / 임계값: \(maxDistance)
+        fastResults: \(useFastResults) / 힌트: \(useContextualWords) / 받아쓰기: \(preferDictation) / 임계값: \(maxDistance)
         \(localeReport)
         \(formatReport)
         결과 \(results.count)개 (확정 \(finalCount), 임시 \(volatileCount)), 평균 지연 \(averageLag.map { String(format: "%.2fs", $0) } ?? "-"), 최대 \(maxLag.map { String(format: "%.2fs", $0) } ?? "-")

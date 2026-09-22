@@ -1,4 +1,5 @@
 import AVFAudio
+import CoreMedia
 import Foundation
 import ScriptTracker
 import Speech
@@ -26,17 +27,35 @@ let script = try String(contentsOf: scriptURL, encoding: .utf8)
 var session = ReadingSession(matcher: CursorMatcher(script: script, configuration: .init(maxNormalizedDistance: threshold)))
 
 // 1. 로케일·모델
-guard SpeechTranscriber.isAvailable else { print("SpeechTranscriber 사용 불가"); exit(2) }
+let useDictation = arguments.contains("--dictation")
+let frequentFinalization = arguments.contains("--frequent-final")
 let locale = Locale(identifier: "ko-KR")
-guard let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
-    print("ko-KR 미지원. 지원 로케일: \(await SpeechTranscriber.supportedLocales.map(\.identifier))")
-    exit(2)
+let modern: SpeechTranscriber?
+let dictation: DictationTranscriber?
+if useDictation || !SpeechTranscriber.isAvailable {
+    guard let supported = await DictationTranscriber.supportedLocale(equivalentTo: locale) else {
+        print("DictationTranscriber ko-KR 미지원. 지원 로케일: \(await DictationTranscriber.supportedLocales.map(\.identifier))")
+        exit(2)
+    }
+    var reporting: Set<DictationTranscriber.ReportingOption> = [.volatileResults]
+    if frequentFinalization { reporting.insert(.frequentFinalization) }
+    dictation = DictationTranscriber(locale: supported, contentHints: [], transcriptionOptions: [], reportingOptions: reporting, attributeOptions: [.audioTimeRange])
+    modern = nil
+    print("모듈 DictationTranscriber(\(supported.identifier)) · SpeechTranscriber.isAvailable=\(SpeechTranscriber.isAvailable) · frequentFinalization=\(frequentFinalization)")
+} else {
+    guard let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
+        print("ko-KR 미지원. 지원 로케일: \(await SpeechTranscriber.supportedLocales.map(\.identifier))")
+        exit(2)
+    }
+    var reporting: Set<SpeechTranscriber.ReportingOption> = [.volatileResults]
+    if useFast { reporting.insert(.fastResults) }
+    modern = SpeechTranscriber(locale: supported, transcriptionOptions: [], reportingOptions: reporting, attributeOptions: [.audioTimeRange])
+    dictation = nil
+    print("모듈 SpeechTranscriber(\(supported.identifier))")
 }
-var reporting: Set<SpeechTranscriber.ReportingOption> = [.volatileResults]
-if useFast { reporting.insert(.fastResults) }
-let transcriber = SpeechTranscriber(locale: supported, transcriptionOptions: [], reportingOptions: reporting, attributeOptions: [.audioTimeRange])
+let transcriber: any SpeechModule = modern.map { $0 as any SpeechModule } ?? dictation!
 let status = await AssetInventory.status(forModules: [transcriber])
-print("로케일 \(supported.identifier) · 모델 상태 \(status) · fast=\(useFast) hints=\(useHints || hintsAtInit) threshold=\(threshold) pace=\(pace) priority=\(arguments.contains("--priority"))")
+print("모델 상태 \(status) · fast=\(useFast) hints=\(useHints || hintsAtInit) threshold=\(threshold) pace=\(pace) priority=\(arguments.contains("--priority"))")
 if status != .installed, let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
     print("모델 내려받는 중…")
     try await request.downloadAndInstall()
@@ -119,36 +138,44 @@ let feeder = Task {
 }
 
 // 4. 결과
-let results = Task {
+struct Stats {
     var count = 0
     var finals = 0
     var lagSum = 0.0
     var lagMax = 0.0
     var lagCount = 0
-    for try await result in transcriber.results {
-        count += 1
-        let text = String(result.text.characters)
-        let wall = Date().timeIntervalSince(startedAt)
-        // 마지막 단어의 audioTimeRange 끝. 피딩이 실시간이므로 (벽시계 − 단어 끝) = 그 단어가 끝난 뒤 결과가 오기까지 걸린 시간.
-        let lastWordEnd = result.text.runs.compactMap { $0.audioTimeRange?.end.seconds }.last
-        let wordLag = lastWordEnd.map { wall - $0 }
-        if let wordLag { lagSum += wordLag; lagMax = max(lagMax, wordLag); lagCount += 1 }
-        if result.isFinal { finals += 1; session.acceptFinal(text) } else { session.acceptVolatile(text) }
-        if verbose {
-            let runs = result.text.runs.map { run -> String in
-                let range = run.audioTimeRange.map { String(format: "%.2f–%.2f", $0.start.seconds, $0.end.seconds) } ?? "-"
-                return "「\(String(result.text[run.range].characters))」\(range)"
-            }
-            print("    runs \(runs.count): \(runs.prefix(8).joined(separator: " "))")
+}
+var stats = Stats()
+@MainActor func handle(_ text: AttributedString, _ isFinal: Bool, _ range: CMTimeRange) {
+    stats.count += 1
+    let plain = String(text.characters)
+    let wall = Date().timeIntervalSince(startedAt)
+    // 마지막 단어의 audioTimeRange 끝. 피딩이 실시간이므로 (벽시계 − 단어 끝) = 그 단어가 끝난 뒤 결과가 오기까지 걸린 시간.
+    let lastWordEnd = text.runs.compactMap { $0.audioTimeRange?.end.seconds }.last
+    let wordLag = lastWordEnd.map { wall - $0 }
+    if let wordLag { stats.lagSum += wordLag; stats.lagMax = max(stats.lagMax, wordLag); stats.lagCount += 1 }
+    if isFinal { stats.finals += 1; session.acceptFinal(plain) } else { session.acceptVolatile(plain) }
+    if verbose {
+        let runs = text.runs.map { run -> String in
+            let r = run.audioTimeRange.map { String(format: "%.2f–%.2f", $0.start.seconds, $0.end.seconds) } ?? "-"
+            return "「\(String(text[run.range].characters))」\(r)"
         }
-        let distance = session.lastDistance.map { String(format: "%.2f", $0) } ?? "-"
-        print(String(format: "%6.2fs %@ [%6.2f–%6.2f] 단어끝 %@ 지연 %@ 커서 %3d 거리 %@ 「%@」",
-                     wall, result.isFinal ? "확정" : "임시", result.range.start.seconds, result.range.end.seconds,
-                     lastWordEnd.map { String(format: "%6.2f", $0) } ?? "     -",
-                     wordLag.map { String(format: "%5.2fs", $0) } ?? "    - ",
-                     session.cursor, distance, text))
+        print("    runs \(runs.count): \(runs.prefix(8).joined(separator: " "))")
     }
-    print("결과 \(count)개(확정 \(finals)) · 단어 지연 평균 \(String(format: "%.2f", lagCount > 0 ? lagSum / Double(lagCount) : 0))s · 최대 \(String(format: "%.2f", lagMax))s · 커서 \(session.cursor)/\(session.tokens.count)")
+    let distance = session.lastDistance.map { String(format: "%.2f", $0) } ?? "-"
+    print(String(format: "%6.2fs %@ [%6.2f–%6.2f] 단어끝 %@ 지연 %@ 커서 %3d 거리 %@ 「%@」",
+                 wall, isFinal ? "확정" : "임시", range.start.seconds, range.end.seconds,
+                 lastWordEnd.map { String(format: "%6.2f", $0) } ?? "     -",
+                 wordLag.map { String(format: "%5.2fs", $0) } ?? "    - ",
+                 session.cursor, distance, plain))
+}
+let results = Task {
+    if let modern {
+        for try await result in modern.results { handle(result.text, result.isFinal, result.range) }
+    } else if let dictation {
+        for try await result in dictation.results { handle(result.text, result.isFinal, result.range) }
+    }
+    print("결과 \(stats.count)개(확정 \(stats.finals)) · 단어 지연 평균 \(String(format: "%.2f", stats.lagCount > 0 ? stats.lagSum / Double(stats.lagCount) : 0))s · 최대 \(String(format: "%.2f", stats.lagMax))s · 커서 \(session.cursor)/\(session.tokens.count)")
 }
 
 if !hintsAtInit { try await analyzer.start(inputSequence: inputSequence) }

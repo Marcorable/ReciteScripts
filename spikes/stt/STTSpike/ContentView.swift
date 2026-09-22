@@ -123,6 +123,7 @@ struct ContentView: View {
             HStack {
                 Toggle("fastResults", isOn: $model.useFastResults)
                 Toggle("대본 힌트", isOn: $model.useContextualWords)
+                Toggle("받아쓰기", isOn: $model.preferDictation)
             }
             .font(.footnote)
             .disabled(model.isRunning)

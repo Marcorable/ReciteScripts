@@ -15,7 +15,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A100000000000000000000A3 /* STTSpike */ = {isa = PBXFileSystemSynchronizedRootGroup; path = STTSpike; sourceTree = "<group>"; };
+		A100000000000000000000A3 /* STTSpike */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = STTSpike;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -193,7 +197,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 9486RJPBM5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "낭독하는 목소리를 온디바이스로 인식해 대본 위치를 따라갑니다. 음성은 저장되거나 전송되지 않습니다.";
@@ -220,7 +224,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 9486RJPBM5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "낭독하는 목소리를 온디바이스로 인식해 대본 위치를 따라갑니다. 음성은 저장되거나 전송되지 않습니다.";

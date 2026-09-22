@@ -1,4 +1,5 @@
 import AVFAudio
+import CoreMedia
 import Foundation
 import Speech
 import Synchronization
@@ -20,6 +21,8 @@ actor SpeechPipeline {
     struct Options: Sendable {
         var locale = Locale(identifier: "ko-KR")
         var fastResults = false
+        /// `SpeechTranscriber`가 기기에서 불가하거나 비교를 원할 때 `DictationTranscriber`(받아쓰기 모델)를 쓴다.
+        var preferDictation = false
         /// 대본 어절을 `AnalysisContext.contextualStrings`로 넘겨 인식 편향을 준다.
         var contextualWords: [String] = []
     }
@@ -45,14 +48,20 @@ actor SpeechPipeline {
     // MARK: - 지원·모델 확인
 
     static func localeReport(for locale: Locale) async -> String {
-        guard SpeechTranscriber.isAvailable else { return "SpeechTranscriber 사용 불가 기기" }
-        let supported = await SpeechTranscriber.supportedLocales.map(\.identifier).sorted()
-        let installed = await SpeechTranscriber.installedLocales.map(\.identifier).sorted()
-        let equivalent = await SpeechTranscriber.supportedLocale(equivalentTo: locale)
-        return """
-        \(locale.identifier) 지원: \(equivalent?.identifier ?? "아니오") · 설치됨: \(installed.contains { $0.hasPrefix("ko") } ? "예" : "아니오")
-        지원 로케일 \(supported.count)개: \(supported.joined(separator: ", "))
-        """
+        var lines: [String] = []
+        if SpeechTranscriber.isAvailable {
+            let supported = await SpeechTranscriber.supportedLocales.map(\.identifier).sorted()
+            let installed = await SpeechTranscriber.installedLocales.map(\.identifier)
+            let equivalent = await SpeechTranscriber.supportedLocale(equivalentTo: locale)
+            lines.append("SpeechTranscriber: \(locale.identifier) \(equivalent == nil ? "미지원" : "지원") · 설치 \(installed.contains { $0.hasPrefix("ko") } ? "예" : "아니오") · 로케일 \(supported.count)개")
+        } else {
+            lines.append("SpeechTranscriber: 이 기기에서 사용 불가 → DictationTranscriber 폴백")
+        }
+        let dictationSupported = await DictationTranscriber.supportedLocales.map(\.identifier).sorted()
+        let dictationInstalled = await DictationTranscriber.installedLocales.map(\.identifier)
+        let dictationEquivalent = await DictationTranscriber.supportedLocale(equivalentTo: locale)
+        lines.append("DictationTranscriber: \(locale.identifier) \(dictationEquivalent == nil ? "미지원" : "지원") · 설치 \(dictationInstalled.contains { $0.hasPrefix("ko") } ? "예" : "아니오") · 로케일 \(dictationSupported.count)개")
+        return lines.joined(separator: "\n")
     }
 
     // MARK: - 시작·정지
@@ -62,26 +71,14 @@ actor SpeechPipeline {
             throw PipelineError.microphoneDenied
         }
 
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: options.locale) else {
-            throw PipelineError.unsupportedLocale(options.locale.identifier)
-        }
-
-        var reporting: Set<SpeechTranscriber.ReportingOption> = [.volatileResults]
-        if options.fastResults { reporting.insert(.fastResults) }
-        let transcriber = SpeechTranscriber(
-            locale: locale,
-            transcriptionOptions: [],
-            reportingOptions: reporting,
-            attributeOptions: [.audioTimeRange]
-        )
-
-        try await ensureAssets(for: transcriber)
+        let module = try await makeModule()
+        try await ensureAssets(for: module.speechModule)
 
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.record, mode: .spokenAudio, options: [])
         try session.setActive(true)
 
-        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        let analyzer = SpeechAnalyzer(modules: [module.speechModule])
         if !options.contextualWords.isEmpty {
             let context = AnalysisContext()
             context.contextualStrings = [.general: options.contextualWords]
@@ -90,7 +87,7 @@ actor SpeechPipeline {
 
         let inputFormat = engine.inputNode.outputFormat(forBus: 0)
         let analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(
-            compatibleWith: [transcriber], considering: inputFormat
+            compatibleWith: [module.speechModule], considering: inputFormat
         )
         let targetFormat = analyzerFormat ?? inputFormat
         let needsConversion = !(inputFormat == targetFormat)
@@ -106,23 +103,7 @@ actor SpeechPipeline {
         let (inputSequence, inputBuilder) = AsyncStream.makeStream(of: AnalyzerInput.self)
         try installTap(inputFormat: inputFormat, targetFormat: targetFormat, into: inputBuilder)
 
-        let resultsTask = Task { [events, audioFed] in
-            do {
-                for try await result in transcriber.results {
-                    let fed = audioFed.seconds
-                    events.yield(.result(
-                        text: String(result.text.characters),
-                        isFinal: result.isFinal,
-                        start: result.range.start.seconds,
-                        end: result.range.end.seconds,
-                        audioFed: fed
-                    ))
-                }
-                events.yield(.finished)
-            } catch {
-                events.yield(.failed("결과 스트림 오류: \(error)"))
-            }
-        }
+        let resultsTask = module.consumeResults(events: events, audioFed: audioFed)
         running = RunningState(analyzer: analyzer, input: inputBuilder, resultsTask: resultsTask)
 
         try await analyzer.start(inputSequence: inputSequence)
@@ -156,7 +137,38 @@ actor SpeechPipeline {
         }
     }
 
-    private func ensureAssets(for transcriber: SpeechTranscriber) async throws {
+    /// 기기 지원 여부에 따라 모듈을 고른다. 두 모듈은 Result 타입이 달라 enum으로 감싼다.
+    private func makeModule() async throws -> TranscriberModule {
+        var reporting: Set<SpeechTranscriber.ReportingOption> = [.volatileResults]
+        if options.fastResults { reporting.insert(.fastResults) }
+
+        if SpeechTranscriber.isAvailable, !options.preferDictation {
+            guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: options.locale) else {
+                throw PipelineError.unsupportedLocale(options.locale.identifier)
+            }
+            events.yield(.status("모듈: SpeechTranscriber(\(locale.identifier))"))
+            return .modern(SpeechTranscriber(
+                locale: locale,
+                transcriptionOptions: [],
+                reportingOptions: reporting,
+                attributeOptions: [.audioTimeRange]
+            ))
+        }
+
+        guard let locale = await DictationTranscriber.supportedLocale(equivalentTo: options.locale) else {
+            throw PipelineError.unsupportedLocale(options.locale.identifier)
+        }
+        events.yield(.status("모듈: DictationTranscriber(\(locale.identifier))\(SpeechTranscriber.isAvailable ? "" : " — SpeechTranscriber 불가 기기")"))
+        return .dictation(DictationTranscriber(
+            locale: locale,
+            contentHints: [],
+            transcriptionOptions: [],
+            reportingOptions: [.volatileResults],
+            attributeOptions: [.audioTimeRange]
+        ))
+    }
+
+    private func ensureAssets(for transcriber: any SpeechModule) async throws {
         let status = await AssetInventory.status(forModules: [transcriber])
         events.yield(.status("모델 상태: \(status)"))
         switch status {
@@ -246,6 +258,52 @@ actor SpeechPipeline {
         default: common = "other"
         }
         return "\(Int(format.sampleRate))Hz \(format.channelCount)ch \(common)\(format.isInterleaved ? " interleaved" : "")"
+    }
+}
+
+/// 기기에 따라 고르는 전사 모듈. `SpeechTranscriber`(iOS 26 신형 모델) 또는 `DictationTranscriber`(받아쓰기 모델, 구형 기기 호환).
+enum TranscriberModule {
+    case modern(SpeechTranscriber)
+    case dictation(DictationTranscriber)
+
+    var speechModule: any SpeechModule {
+        switch self {
+        case .modern(let module): module
+        case .dictation(let module): module
+        }
+    }
+
+    func consumeResults(events: AsyncStream<PipelineEvent>.Continuation, audioFed: AudioClock) -> Task<Void, Never> {
+        Task {
+            do {
+                switch self {
+                case .modern(let module):
+                    for try await result in module.results {
+                        Self.emit(result.text, result.isFinal, result.range, events, audioFed)
+                    }
+                case .dictation(let module):
+                    for try await result in module.results {
+                        Self.emit(result.text, result.isFinal, result.range, events, audioFed)
+                    }
+                }
+                events.yield(.finished)
+            } catch {
+                events.yield(.failed("결과 스트림 오류: \(error)"))
+            }
+        }
+    }
+
+    private static func emit(
+        _ text: AttributedString, _ isFinal: Bool, _ range: CMTimeRange,
+        _ events: AsyncStream<PipelineEvent>.Continuation, _ audioFed: AudioClock
+    ) {
+        events.yield(.result(
+            text: String(text.characters),
+            isFinal: isFinal,
+            start: range.start.seconds,
+            end: range.end.seconds,
+            audioFed: audioFed.seconds
+        ))
     }
 }
 
