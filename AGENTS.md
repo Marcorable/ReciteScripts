@@ -21,7 +21,7 @@
 | 4 | **리뷰 방식** — AI 1차 리뷰(Codex + CodeRabbit), Marco 2차 리뷰(구조·방향). Marco는 PR 코멘트만 남기고 수정은 에이전트가 한다. | 확정 |
 | 5 | **교차 모델 리뷰** — 구현한 모델과 다른 모델이 리뷰한다 (Claude 구현 → Codex 리뷰, 또는 그 반대). | 확정 |
 | 6 | **프로젝트 구조** — 앱 타깃은 껍데기, 로직은 로컬 SPM 패키지 / Tuist / XcodeGen 중 선택. | **미정** — 3단계 Walking Skeleton 때 결정 |
-| 7 | **시크릿** — 서명 인증서, App Store Connect API 키는 레포 밖에 보관. 에이전트는 시크릿 파일을 읽거나 생성·커밋하지 않는다. 필요하면 `needs-marco` 라벨로 넘긴다. | 확정 |
+| 7 | **시크릿** — 서명 인증서, App Store Connect API 키는 레포 밖에 보관. 에이전트는 시크릿 파일을 읽거나 생성·커밋하지 않는다. 필요하면 `user` 라벨로 넘긴다. | 확정 |
 
 ### Marco가 코드를 직접 수정하지 않는다
 
@@ -38,7 +38,7 @@
 5. OCR 등을 넣을 때는 범용 기능으로 표현한다 ("사진에서 텍스트 가져오기").
 6. 스토어 문구는 용도 안내 수준으로 한다 ("기도문, 독경, 발표 대본을 입력해 사용할 수 있습니다").
 7. 앱 이름·아이콘·UI 문구는 특정 종교·용도색 없이 **중립**으로 한다 ("기도" 대신 "낭독", "대본" 등).
-8. 기본 탑재 텍스트가 필요해지면 권리자 서면 허락이 선행돼야 하며, 문의 여부는 Marco가 결정한다(`needs-marco`). 허락을 받을 경우를 대비해 "기본 묶음"을 넣을 수 있도록 데이터 구조는 열어둔다.
+8. 기본 탑재 텍스트가 필요해지면 권리자 서면 허락이 선행돼야 하며, 문의 여부는 Marco가 결정한다(`user`). 허락을 받을 경우를 대비해 "기본 묶음"을 넣을 수 있도록 데이터 구조는 열어둔다.
 
 ## 4. Public 레포 — 시크릿·개인정보
 
@@ -58,12 +58,13 @@
 
 - **Issue**가 모든 작업 단위다. 비개발 작업(기획·디자인·스토어 제출)도 Issue로 만든다.
 - **Milestone**: `0. 기반 세팅` ~ `6. 출시 후`.
-- **라벨**: `agent-ready`, `needs-marco`, `phase:0`~`phase:6`, `role:planner` / `role:designer` / `role:developer` / `role:qa` / `role:marketer`.
+- **라벨**: `user`, `agent:planner` / `agent:designer` / `agent:developer` / `agent:qa` / `agent:marketer`.
+- **자동 할당**: `user` 라벨이 붙은 Issue는 Marco(`Marcorable`)에게 자동 할당한다.
 - **Project 필드**: `Status`(Backlog / Ready / In Progress / In Review / Done), `Phase`(0~6), `Model`(Claude / Codex / Marco), `Role`(Planner / Designer / Developer / QA / Marketer).
 - **브랜치**: Issue 번호 기반 `feature/#N`. worktree로 병렬 작업.
-- **PR**: 본문에 `Closes #N`. 한 PR은 한 Issue. PR을 한꺼번에 여러 개 열지 않는다(CodeRabbit OSS rate limit).
+- **PR**: 제목은 `[Category] 한글 제목` 형식으로 쓴다. Category는 `Feature` / `Fix` / `Documentation` / `Chore` / `Refactoring` / `Test` / `Style` 중에서 고른다. 본문에 `Closes #N`. 한 PR은 한 Issue. PR을 한꺼번에 여러 개 열지 않는다(CodeRabbit OSS rate limit).
 - **커밋 메시지**: [Udacity Git Commit Message Style](https://udacity.github.io/git-styleguide/)을 따른다.
-  - 제목: `type: Subject` — 타입은 `feat` / `fix` / `docs` / `style` / `refactor` / `test` / `chore`, 영어 명령형, 첫 글자 대문자, 마침표 없음, 50자 이내.
+  - 제목: `type: 제목` — 타입은 `feat` / `fix` / `docs` / `style` / `refactor` / `test` / `chore`, 제목은 한글, 마침표 없음, 50자 이내.
   - 본문(선택): 제목과 빈 줄로 구분, 한 줄 72자 이내, "무엇을·왜"를 적는다. 한국어 가능.
   - 푸터(선택): `Closes #N` 등 Issue 참조.
 
@@ -119,7 +120,7 @@ PR 오픈 → Codex 자동 리뷰 (1차, P0/P1만)
 3. 시뮬레이터 실행 + 해당 화면 스크린샷
 4. (UI 변경 시) 큰 글씨(Accessibility XL) 스크린샷 1장
 
-빌드·테스트 실패를 "환경 문제"로 넘기지 않는다. 못 풀면 Issue에 상황을 적고 `needs-marco`를 붙인다.
+빌드·테스트 실패를 "환경 문제"로 넘기지 않는다. 못 풀면 Issue에 상황을 적고 `user`를 붙인다.
 
 ## 9. 문서와 로그
 

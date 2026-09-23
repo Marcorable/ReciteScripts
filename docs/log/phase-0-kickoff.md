@@ -15,8 +15,8 @@
 | 역할별 에이전트 | 5개 역할: Planner / Designer / Developer / QA / Marketer |
 | 역할 파일 위치 | `docs/agents/<role>.md` = 모델 중립 **원본** (Claude/Codex/Slack 공용). `.claude/agents/<role>.md` = frontmatter(name/description/tools/model) + 원본 참조 |
 | Project 필드 | `Status`(Backlog/Ready/In Progress/In Review/Done), `Phase`(0~6), `Model`(Claude/Codex/Marco), `Role`(Planner/Designer/Developer/QA/Marketer) |
-| 라벨 | `agent-ready`, `needs-marco`, `phase:0`~`phase:6`, `role:planner` … `role:marketer` |
-| Slack 연동 | 0단계 필수 아님. `needs-marco` Issue로 백로그에 둔다. 개발·QA 역할은 Xcode·시뮬레이터가 필요하므로 로컬(Orca)이 홈, Slack은 기획·마케팅 역할의 대화 창구 후보 |
+| 라벨 | `user`, `agent:planner` … `agent:marketer` |
+| Slack 연동 | 0단계 필수 아님. `user` Issue로 백로그에 둔다. 개발·QA 역할은 Xcode·시뮬레이터가 필요하므로 로컬(Orca)이 홈, Slack은 기획·마케팅 역할의 대화 창구 후보 |
 
 ## 보류 (Marco가 직접 결정)
 
@@ -38,7 +38,7 @@
 3. **커밋 목록을 Marco에게 보여주고 확인받은 뒤** `gh repo create Marcorable/recite --public --source . --push`
 4. Milestone 7개(`0. 기반 세팅` ~ `6. 출시 후`), 라벨 생성
 5. Project 생성 + `Phase`, `Model`, `Role` 필드 추가 (project scope 필요)
-6. Issue 목록 초안을 **표로 먼저 보여주고** 확인 후 생성 → milestone·label 지정 → Project 추가. STT 스파이크 Issue를 첫 번째 개발 Issue로. Slack 연동 Issue(`needs-marco`) 포함
+6. Issue 목록 초안을 **표로 먼저 보여주고** 확인 후 생성 → milestone·label 지정 → Project 추가. STT 스파이크 Issue를 첫 번째 개발 Issue로. Slack 연동 Issue(`user`) 포함
 7. HANDOFF 2번 앱 컨셉 기반으로 기획 디테일 질문 목록을 만들고 **하나씩** 묻는다
 8. 생성된 Issue 목록을 표로 보고
 
