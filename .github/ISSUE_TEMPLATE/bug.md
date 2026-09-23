@@ -2,7 +2,7 @@
 name: 버그 (Bug)
 about: 동작이 기대와 다를 때
 title: ""
-labels: ["🐞 Bug"]
+labels: []
 assignees: []
 ---
 
