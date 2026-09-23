@@ -62,7 +62,7 @@
 - **자동 할당**: `user` 라벨이 붙은 Issue는 Marco(`Marcorable`)에게 자동 할당한다.
 - **Project 필드**: `Status`(Backlog / Ready / In Progress / In Review / Done), `Phase`(0~6), `Model`(Claude / Codex / Marco), `Role`(Planner / Designer / Developer / QA / Marketer).
 - **브랜치**: Issue 번호 기반 `feature/#N`. worktree로 병렬 작업.
-- **PR**: 제목은 `[Category] Summary` 형식으로 쓴다. Category는 `Feature` / `Fix` / `Documentation` / `Chore` / `Refactoring` / `Test` / `Style` 중에서 고른다. 본문에 `Closes #N`. 한 PR은 한 Issue. PR을 한꺼번에 여러 개 열지 않는다(CodeRabbit OSS rate limit).
+- **PR**: 제목은 `[Category] 한글 제목` 형식으로 쓴다. Category는 `Feature` / `Fix` / `Documentation` / `Chore` / `Refactoring` / `Test` / `Style` 중에서 고른다. 본문에 `Closes #N`. 한 PR은 한 Issue. PR을 한꺼번에 여러 개 열지 않는다(CodeRabbit OSS rate limit).
 - **커밋 메시지**: [Udacity Git Commit Message Style](https://udacity.github.io/git-styleguide/)을 따른다.
   - 제목: `type: 제목` — 타입은 `feat` / `fix` / `docs` / `style` / `refactor` / `test` / `chore`, 제목은 한글, 마침표 없음, 50자 이내.
   - 본문(선택): 제목과 빈 줄로 구분, 한 줄 72자 이내, "무엇을·왜"를 적는다. 한국어 가능.
