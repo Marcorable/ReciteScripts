@@ -58,3 +58,10 @@ Marco 개입 없이 에이전트 세션에서 네 단계가 모두 돌았다.
   공유 스킴(`xcshareddata/xcschemes/*.xcscheme`)에 빈 `<TestPlans></TestPlans>`가 있으면 `TestAction`이 무시된다. 요소를 지우니 통과했다. 스킴을 손으로 쓸 때는 빈 요소를 남기지 않는다.
 - **`Executed 0 tests`가 찍히는데 실제로는 테스트가 돈다.**
   Swift Testing과 XCTest는 결과 줄 형식이 다르다. XCTest 집계(`Executed N tests`)는 Swift Testing 결과를 세지 않는다. `test.sh`는 두 형식을 모두 출력한다.
+
+## 리뷰에서 잡힌 것 (PR #49)
+
+- **테스트 0개가 성공으로 보고됐다.** `xcodebuild test`는 테스트를 하나도 찾지 못해도 성공한다. 결과 줄만 출력하고 `|| true`로 넘기면 검증 루프가 거짓으로 통과한다. `test.sh`는 이제 실행 개수가 1 이상인지 확인하고, 아니면 종료 코드 1로 끝낸다.
+- **시뮬레이터 fallback이 배포 타깃을 무시했다.** 요청한 이름이 없을 때 아무 iOS 런타임의 첫 iPhone을 골랐다. iOS 17·18·26·27 런타임이 함께 깔린 머신에서는 빌드할 수 없는 기기가 잡힌다. 이제 `IPHONEOS_DEPLOYMENT_TARGET`을 읽어 그 이상인 런타임만 후보로 두고, 그중 가장 최신을 고른다.
+
+두 건 모두 P1인데 **PR이 머지된 뒤에 리뷰가 도착했다.** 리뷰를 기다리지 않고 머지하면 P1이 뒤늦게 오므로, PR 오픈 후 Codex·CodeRabbit 리뷰가 붙은 것을 확인하고 머지한다.
