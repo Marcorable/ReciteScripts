@@ -61,7 +61,7 @@
 - **라벨**: `user`, `agent:planner` / `agent:designer` / `agent:developer` / `agent:qa` / `agent:marketer`.
 - **자동 할당**: `user` 라벨이 붙은 Issue는 Marco(`Marcorable`)에게 자동 할당한다.
 - **Project 필드**: `Status`(Backlog / Ready / In Progress / In Review / Done), `Phase`(0~6), `Model`(Claude / Codex / Marco), `Role`(Planner / Designer / Developer / QA / Marketer).
-- **기본 브랜치**: `develop`. 모든 작업 브랜치는 `develop`에서 따고, PR 베이스도 `develop`이다. `main`은 출시용이다.
+- **기본 브랜치**: `develop`. 독립 작업과 상위 작업 브랜치는 `develop`에서 따고 PR 베이스도 `develop`이다. 하위 이슈의 스택 PR만 아직 병합되지 않은 상위 작업 브랜치를 베이스로 삼는다. `main`은 출시용이다.
 - **브랜치**: Issue 번호만 쓴다 — `51`. 하위 이슈가 생길 상위 이슈는 `<번호>/parent`, 하위 이슈는 `<상위>/<하위>`. 작업 종류는 브랜치가 아니라 PR 제목에 쓴다. worktree로 병렬 작업.
 - **PR**: 제목은 `[Category] 한글 제목` 형식으로 쓴다. Category는 `Feature` / `Fix` / `Documentation` / `Chore` / `Refactoring` / `Test` / `Style` 중에서 고른다. 본문에 `Closes #N`. 한 PR은 한 Issue. PR을 한꺼번에 여러 개 열지 않는다(CodeRabbit OSS rate limit).
 - **커밋 메시지**: marcorable-kit `commit` 스킬(`agent-common/marcorable-github/skills/commit/`) 형식을 따른다.
