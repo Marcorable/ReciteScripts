@@ -61,12 +61,16 @@
 - **라벨**: `user`, `agent:planner` / `agent:designer` / `agent:developer` / `agent:qa` / `agent:marketer`.
 - **자동 할당**: `user` 라벨이 붙은 Issue는 Marco(`Marcorable`)에게 자동 할당한다.
 - **Project 필드**: `Status`(Backlog / Ready / In Progress / In Review / Done), `Phase`(0~6), `Model`(Claude / Codex / Marco), `Role`(Planner / Designer / Developer / QA / Marketer).
-- **브랜치**: Issue 번호 기반 `feature/#N`. worktree로 병렬 작업.
+- **기본 브랜치**: `develop`. 모든 작업 브랜치는 `develop`에서 따고, PR 베이스도 `develop`이다. `main`은 출시용이다.
+- **브랜치**: Issue 번호만 쓴다 — `51`. 하위 이슈가 생길 상위 이슈는 `<번호>/parent`, 하위 이슈는 `<상위>/<하위>`. 작업 종류는 브랜치가 아니라 PR 제목에 쓴다. worktree로 병렬 작업.
 - **PR**: 제목은 `[Category] 한글 제목` 형식으로 쓴다. Category는 `Feature` / `Fix` / `Documentation` / `Chore` / `Refactoring` / `Test` / `Style` 중에서 고른다. 본문에 `Closes #N`. 한 PR은 한 Issue. PR을 한꺼번에 여러 개 열지 않는다(CodeRabbit OSS rate limit).
-- **커밋 메시지**: [Udacity Git Commit Message Style](https://udacity.github.io/git-styleguide/)을 따른다.
-  - 제목: `type: 제목` — 타입은 `feat` / `fix` / `docs` / `style` / `refactor` / `test` / `chore`, 제목은 한글, 마침표 없음, 50자 이내.
-  - 본문(선택): 제목과 빈 줄로 구분, 한 줄 72자 이내, "무엇을·왜"를 적는다. 한국어 가능.
-  - 푸터(선택): `Closes #N` 등 Issue 참조.
+- **커밋 메시지**: marcorable-kit `commit` 스킬(`agent-common/marcorable-github/skills/commit/`) 형식을 따른다.
+  - 제목: `[#N] type: 요약` — `#N`은 브랜치의 자기 이슈 번호 하나. `develop`·`main`처럼 번호 없는 브랜치에서는 prefix를 생략한다.
+  - type: `feat` / `fix` / `refactor` / `modify` / `rename` / `docs` / `style` / `test` / `chore`.
+  - 요약은 한글 명사형 종결("~추가", "~수정", "~적용"), 마침표 없음. 코드 이름은 그대로 쓴다.
+  - 본문(선택): 제목과 빈 줄로 구분, 상세는 `- ` 목록으로 쓴다.
+  - 리뷰 반영 커밋은 `[#N] fix: Code Review K`(K는 같은 브랜치의 이전 번호 + 1).
+  - `Co-Authored-By` 같은 attribution 줄은 넣지 않는다.
 
 ### 리뷰 흐름
 
