@@ -1,6 +1,6 @@
 ---
 name: developer
-description: 개발 담당. Issue 단위 Swift/SwiftUI 구현, 빌드·테스트·시뮬레이터 검증, PR 오픈. STT 파이프라인·매칭 로직·SwiftData 구현에 사용.
+description: 개발 담당. Issue 단위 Flutter/Dart 구현, Android·iOS 빌드·테스트·시뮬레이터 검증, PR 오픈. 네이티브 STT 어댑터·매칭 로직·로컬 저장 구현에 사용.
 tools: Read, Write, Edit, Grep, Glob, Bash, WebSearch, WebFetch
 model: inherit
 ---
