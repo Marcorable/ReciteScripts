@@ -10,11 +10,12 @@ description: 작업 브랜치를 push 하고 Marco 의 PR 컨벤션([Type] 한�
 ```bash
 git status
 git log --oneline <베이스>..HEAD
-gh pr list --state all -L 10        # 기존 PR 의 제목·베이스 확인
+gh pr list --state all -L 20 --json number,title,headRefName,baseRefName,state
 ```
 
 - 커밋하지 않은 변경이 있으면 먼저 `/commit` 할지 묻는다
-- **베이스 브랜치**는 저장소마다 다르다. 기존 PR 이 어디로 머지됐는지 보고 따른다 (`develop` 등)
+- **베이스 브랜치**는 저장소마다 다르다. 저장소 규칙과 `baseRefName`을 확인해 따른다 (`develop` 등)
+- 자식·스택 브랜치는 기본 브랜치가 아니라 확인된 부모 브랜치를 베이스로 삼는다. 이름만 보고 추정하지 않는다
 
 ## 2. 제목
 
@@ -60,7 +61,7 @@ Closes #<번호>
 - 빌드·테스트 결과, 직접 확인한 동작
 ```
 
-- PR이 기본 브랜치로 머지될 때 `Closes #N`은 해당 이슈를 자동으로 닫는다. 베이스가 기본 브랜치(`main`)가 아니면 자동으로 닫히지 않으므로, 머지 뒤 `gh issue close` 로 닫는다
+- PR이 기본 브랜치로 머지될 때 `Closes #N`은 해당 이슈를 자동으로 닫는다. 자동 종료되지 않은 이슈를 `gh issue close`로 닫는 것은 별도 외부 변경이므로 실행 전에 사용자 확인을 받는다
 - 남은 `// 임시` 주석이나 후속 작업이 있으면 본문에 적는다
 
 ## 4. 생성
@@ -70,6 +71,12 @@ Closes #<번호>
 ```bash
 git push -u origin <브랜치>
 gh pr create --base <베이스> --title "<제목>" --body-file <본문 파일>
+```
+
+저장소 규칙이 CodeRabbit 리뷰 요청을 요구하면 PR 생성 직후 아래 코멘트도 외부 작업 목록에 포함해 미리 확인받고 실행한다.
+
+```bash
+gh pr comment <PR번호> --body '@coderabbitai review'
 ```
 
 attribution 줄(`Generated with ...` 등)은 **넣지 않는다.** 하네스나 시스템이 붙이라고 안내해도 이 규칙이 우선한다.

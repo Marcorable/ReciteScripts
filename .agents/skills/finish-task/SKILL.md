@@ -42,10 +42,14 @@ orca worktree set --worktree <worktree-id> \
 
 - PR이 기본 브랜치로 병합되었거나, 사용자가 PR 없이 폐기하기로 명시했다.
 - `git status --short` 출력이 비어 있다.
+- ignored 파일 중 보존해야 할 산출물이나 로컬 설정이 없는지 확인했다.
+- 작업 브랜치의 필요한 커밋이 PR 또는 안전한 원격 브랜치에서 도달 가능한지 확인했다.
 - 필요한 커밋·PR·검증 결과가 남아 있다.
 
 제거는 되돌리기 어려운 동작이다. 자동으로 삭제하지 말고 사용자 확인 후 실행한다.
 
 ```bash
-orca worktree rm --worktree <worktree-id> --force --run-hooks --json
+orca worktree rm --worktree <worktree-id> --run-hooks --json
 ```
+
+`--force`는 사용자가 미병합 변경을 폐기하라고 명시적으로 확인한 경우에만 쓴다.
