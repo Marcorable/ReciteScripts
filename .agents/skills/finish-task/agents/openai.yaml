@@ -1,0 +1,4 @@
+interface:
+  display_name: "작업 마무리"
+  short_description: "검증과 인계를 정리하고 안전한 정리를 준비합니다"
+  default_prompt: "Use $finish-task to verify and hand off an Orca task."

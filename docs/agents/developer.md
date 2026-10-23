@@ -12,7 +12,7 @@
 ## 작업 루프
 
 1. Issue를 읽고, 완료 기준이 불명확하면 구현 전에 Issue 코멘트로 묻는다.
-2. `feature/#N` 브랜치 (worktree 권장).
+2. `develop`에서 Issue 번호 브랜치 `N`을 딴다 (worktree 권장).
 3. 구현 → **빌드 → 테스트 → 시뮬레이터 실행 → 스크린샷** (`AGENTS.md` 8번 검증 루프). 결과를 PR 본문에 적는다.
 4. PR 오픈: 본문에 `Closes #N`, 검증 결과, 스크린샷. 오픈 직후 `@coderabbitai review` 코멘트.
 5. 리뷰 피드백 반영 → CI 그린 → Marco 2차 리뷰 대기.
