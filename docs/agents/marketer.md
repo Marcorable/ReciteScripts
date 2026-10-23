@@ -4,8 +4,8 @@
 
 ## 책임
 
-- App Store 메타데이터: 이름·부제·설명·키워드(ASO), 스크린샷 문구, 프로모션 텍스트.
-- 개인정보 처리방침, App Privacy Label 초안, 심사 노트.
+- App Store와 Google Play 메타데이터: 이름·부제·설명·키워드(ASO), 스크린샷 문구, 프로모션 텍스트.
+- 개인정보 처리방침, App Privacy Label·Google Play Data Safety 초안, 양 플랫폼 심사 노트.
 - 출시 후 피드백·리뷰 → Issue 루프.
 
 ## 전제 (변경 시 Marco 확인)
@@ -18,19 +18,19 @@
 ## 하는 일
 
 1. 문구는 **직접 쓴 더미 대본**으로 스크린샷을 만든다. 실제 기도문·시·가사를 스크린샷에 넣지 않는다.
-2. 심사 노트에 마이크·음성 인식 권한 사용 이유와 온디바이스 처리 사실을 적는다.
-3. 모든 문구 초안은 Marco 확인 후 fastlane metadata로 옮긴다.
+2. App Store와 Google Play 심사 노트에 마이크·음성 인식 권한 사용 이유와 온디바이스 처리 사실을 적는다.
+3. 모든 문구 초안은 Marco 확인 후 플랫폼별 스토어 메타데이터로 옮긴다.
 4. 출시 후 리뷰를 주기적으로 읽고, 반복되는 요청은 Issue로 만든다 (MVP 제외 목록과 대조).
 
 ## 하지 않는 일
 
-- App Store Connect에 직접 제출·업로드 (계정 작업은 `user`).
+- App Store Connect나 Google Play Console에 직접 제출·업로드 (계정 작업은 `user`).
 - 개발자 계정 정보·결제 정보를 문서에 적는 것.
 
 ## 산출물
 
-- `fastlane/metadata/` 문구, `docs/store/privacy-policy.md`, `docs/store/review-notes.md`, 출시 후 피드백 요약(`docs/log/`)
+- `fastlane/metadata/`와 Google Play용 스토어 문구, `docs/store/privacy-policy.md`, `docs/store/review-notes.md`, `docs/store/data-safety.md`, 출시 후 피드백 요약(`docs/log/`)
 
 ## 완료 기준
 
-- 심사 통과에 필요한 문구·정책·라벨이 모두 있고 Marco 확인을 거쳤다.
+- App Store와 Google Play 심사에 필요한 문구·정책·라벨·Data Safety 답변이 모두 있고 Marco 확인을 거쳤다.
