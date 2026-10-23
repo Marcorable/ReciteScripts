@@ -1,13 +1,13 @@
 # Developer
 
 > 모델 중립 원본. 공통 규칙은 `AGENTS.md`가 우선한다.
-> Swift / SwiftUI 리뷰 기준은 `AGENTS.md` 7번 Review guidelines를 따른다.
+> Flutter와 네이티브 STT 리뷰 기준은 `AGENTS.md` 7번 Review guidelines를 따른다.
 
 ## 책임
 
 - Issue 단위로 기능을 구현하고 PR을 연다.
 - 3단계 첫 작업은 기능이 아니라 **Walking Skeleton**(빈 앱 → CI → 서명 → TestFlight)이다.
-- 매칭 로직(STT 결과 ↔ 대본 커서)은 UI·STT와 분리된 **순수 Swift 모듈**로 만들고 유닛 테스트로 검증한다.
+- 매칭 로직(STT 결과 ↔ 대본 커서)은 Flutter UI·플랫폼 STT와 분리된 **순수 Dart 모듈**로 만들고 유닛 테스트로 검증한다.
 
 ## 작업 루프
 
@@ -20,12 +20,13 @@
 
 ## 기술 기준
 
-- iOS 26+, Swift 6 strict concurrency. `@Observable`, SwiftData(`cloudKitDatabase: .none`).
-- STT: `SpeechAnalyzer` + `SpeechTranscriber`(온디바이스). 중간 결과 `reportingOptions: [.volatileResults]`, 어절 타이밍 `attributeOptions: [.audioTimeRange]`. 실행 시 `ko-KR` 지원과 모델 설치 상태를 확인한다.
-- 알려진 함정: `AVAudioEngine` 입력 포맷 ≠ `SpeechAnalyzer.bestAvailableAudioFormat` → 에러 없이 전사 0건. `AVAudioConverter`로 맞춘다.
+- Flutter stable 버전을 고정하고 Android Studio를 주 IDE로 사용한다. Xcode는 iOS 빌드·시뮬레이터·서명·배포에 병행한다.
+- 최소 지원 버전은 iOS 26+와 Android 13/API 33+다. 출시 후 iOS 18~25와 Android API 31~32 어댑터를 추가할 수 있게 경계를 유지한다.
+- STT: iOS는 `SpeechAnalyzer` + `SpeechTranscriber`, Android는 on-device `SpeechRecognizer`를 사용한다. 실행 시 권한, `ko-KR` 지원, 온디바이스 인식 가능 상태를 확인한다.
+- 플랫폼 STT의 부분 결과·최종 결과·오류·취소·앱 생명주기를 하나의 Dart 계약으로 정규화한다. 브리지 방식은 Issue #23에서 공식 문서와 타입 안전성을 기준으로 결정한다.
 - 커서는 **앞으로만** 간다. 현재 커서 이후 어절과만 유사도를 비교한다. 비교 전 공백·문장부호를 제거한다.
 - API 정보는 구현 전에 최신 공식 문서로 확인한다. 기억에 의존하지 않는다.
-- 프로젝트 구조(SPM / Tuist / XcodeGen)는 **미정**. Walking Skeleton Issue에서 Marco와 결정한다.
+- Flutter 프로젝트 구조와 네이티브 브리지 방식은 **미정**. Issue #23에서 Marco와 결정한다.
 
 ## 절대 하지 않는 일
 
