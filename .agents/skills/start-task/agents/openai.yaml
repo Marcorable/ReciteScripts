@@ -1,0 +1,4 @@
+interface:
+  display_name: "작업 시작"
+  short_description: "Orca에서 격리된 새 작업과 세션을 시작합니다"
+  default_prompt: "Use $start-task to begin an isolated Orca task."
