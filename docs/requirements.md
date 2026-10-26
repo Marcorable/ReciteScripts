@@ -131,6 +131,9 @@ MVP는 기능 수보다 다음 경험을 우선한다.
 
 ### 확정
 
+- 한국어 제품명·스토어명·앱 표시 이름 `말또`
+- iOS Bundle ID·Android applicationId `com.marcorable.maltto`, Flutter 프로젝트명 `maltto`
+- 글로벌 표시 이름은 다국어 출시 검토 시 별도 Issue에서 결정
 - Flutter/Dart 단일 코드베이스
 - Android Studio 주 IDE, Xcode 병행
 - 양 플랫폼에 Flutter Cupertino 스타일 적용
@@ -168,7 +171,6 @@ MVP는 기능 수보다 다음 경험을 우선한다.
 | 항목 | Issue | 필요한 시점 |
 |---|---|---|
 | Apple·Google 계정 형태와 출시 주체 | #9 | 서명·스토어 배포 전 |
-| 중립적인 앱 이름 | #17 | 스토어 메타데이터·앱 식별자 확정 전 |
 | 앱 아이콘 최종 방향 | #22 | 디자인 단계 완료 전 |
 
 ## 10. 후속 산출물 연결
