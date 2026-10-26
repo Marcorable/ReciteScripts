@@ -188,3 +188,50 @@ TTS 재현으로 확인: 같은 조건에서 **두 번째 갱신(1.9초)에 커�
 - 건너뛰기 수정의 실기기 재확인
 - "다음 어절 강조" 실기기 A/B
 - `AnalysisContext.contextualStrings`: Mac에서 `SpeechTranscriber`는 무시, `DictationTranscriber`는 유효(음차 대본 17/28 → 28/28). 실기기 교차 확인 미완. MVP에서 신형 모델을 쓰므로 당장은 무의미.
+
+## 7. Android 온디바이스 스파이크 (Issue #12, 2026-10-26)
+
+> Android 검증 앱은 `spikes/android_stt/`에 있다. Flutter `MethodChannel`/`EventChannel`로 API 33+ 네이티브 `SpeechRecognizer`의 상태와 부분·최종 결과를 관찰하는 일회성 코드다. Issue #23의 제품 브리지 설계를 확정하지 않는다.
+
+### 7.1 공식 API 계약
+
+- `SpeechRecognizer.isOnDeviceRecognitionAvailable`을 먼저 확인하고, 참일 때만 `createOnDeviceSpeechRecognizer`를 사용한다. 일반 `createSpeechRecognizer` 폴백은 네트워크 사용 가능성을 만들기 때문에 스파이크에 넣지 않았다.
+- 인식 요청은 `ko-KR`, `LANGUAGE_MODEL_FREE_FORM`, `EXTRA_PARTIAL_RESULTS`, `EXTRA_PREFER_OFFLINE`을 지정한다. 다만 Android 공식 문서상 부분 결과와 오프라인 선호 extra는 인식 서비스가 무시할 수 있으므로, 실제 기기·비행기 모드 검증이 별도로 필요하다.
+- API 33의 `checkRecognitionSupport`로 설치·대기·지원 언어를 구분하고 `triggerModelDownload`로 모델 설치를 요청한다.
+- `onPartialResults`는 한 세션에 0회 이상 올 수 있고, `onResults` 또는 `onError`가 올 때까지 다음 세션을 시작하지 않는다.
+- 화면이 백그라운드로 가면 Dart에서 `cancel`, Activity 종료 시 네이티브에서 `cancel`과 `destroy`를 호출한다. 오디오 버퍼와 전사문은 저장하거나 외부로 보내지 않는다.
+
+참조: Android Developers의 `SpeechRecognizer`, `RecognizerIntent`, `RecognitionListener` API 문서(2026-10-26 확인).
+
+### 7.2 에뮬레이터 사전 검증
+
+| 항목 | 결과 |
+|---|---|
+| 환경 | Android Emulator `sdk_gphone64_arm64`, API 36, Google Play 이미지 |
+| 온디바이스 서비스 | `isOnDeviceRecognitionAvailable == true` |
+| 인식 서비스 | Google TTS `GoogleTTSRecognitionService` |
+| `ko-KR` 지원 | `supportedOnDeviceLanguages`에 포함 |
+| 모델 상태 | 최초 미설치. 앱에서 37.57MB 한국어 업데이트 승인 후 `installedOnDeviceLanguages == [ko-KR]` 및 `ModelDownloadListener.onSuccess` 확인 |
+| 비행기 모드 | 네트워크를 끈 상태에서도 `onReadyForSpeech` 도달. 설치 모델로 온디바이스 세션이 시작됨 |
+| 시작 결과 | 모델 미설치 상태에서는 `ERROR_LANGUAGE_UNAVAILABLE(13)`, 설치 후 무음에서는 `ERROR_NO_MATCH(7)` 반환 |
+| 마이크 입력 | Emulator Extended Controls의 `Enable Host Microphone Access` 활성화 확인 |
+| UI | 앱 실행, 지원·다운로드 진행 상태, 권한, 준비·오류 이벤트의 Flutter 전달 확인 |
+
+첫 부팅에서 System UI ANR이 반복됐으나 AVD 재부팅 뒤 앱 화면은 정상 렌더링됐다. 이는 인식 앱 프로세스의 crash가 아니며, 에뮬레이터만으로 한국어 마이크 품질을 판단하지 않는다.
+
+호스트의 기본 입출력이 AirPods로 분리된 상태라 macOS TTS의 소리가 호스트 마이크에 들어가지 않았다. Emulator gRPC `injectAudio`로 직접 작성한 한국어 TTS PCM도 주입했으나 Google 온디바이스 인식 서비스는 `ERROR_NO_MATCH`를 반환했다.
+
+호스트 마이크 경로는 `onRmsChanged`가 -2.0~3.8dB로 변하고 `onBeginningOfSpeech`/`onEndOfSpeech`가 발생해 오디오 전달 자체는 확인했다. 하지만 같은 세션에서 부분·최종 텍스트 없이 `ERROR_NO_MATCH`로 끝났다. 따라서 이 AVD에서는 모델 설치·오프라인 세션·오디오 생명주기까지 검증됐지만 **한국어 전사 품질과 부분 결과 발생 여부는 판정할 수 없다.**
+
+### 7.3 결정과 QA 인계
+
+API 33+ 제품 구현은 Android 시스템 온디바이스 `SpeechRecognizer`를 **조건부 채택**한다. AVD에서 한국어 모델 설치, 비행기 모드 세션 시작, 마이크 오디오 유입, 취소·종료 생명주기가 확인됐으므로 현재 단계에서 Vosk 다운로드형 모델을 추가 비교하지 않는다.
+
+다만 AVD에서는 실제 한국어 전사와 부분 결과가 나오지 않았으므로 아래 항목은 시스템 STT의 출시 적합성을 확정하는 Issue #36의 실기기 QA로 넘긴다.
+
+- Pixel과 Samsung API 33+에서 `ko-KR` 모델 설치 상태 확인
+- 비행기 모드에서 부분·최종 결과와 네트워크 오류 부재 확인
+- 중간 침묵, 빠른 목소리, 작은 목소리, 5분 이상 연속 낭독
+- 부분 결과 주기·최종 지연·메모리·배터리와 제조사별 오류/재시작 계약 비교
+
+Issue #36에서 시스템 STT가 낭독 추적 기준을 충족하지 못하는 경우에만 Vosk 등 다운로드형 모델 비교를 새 작업으로 분리한다.
