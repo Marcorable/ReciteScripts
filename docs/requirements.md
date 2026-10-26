@@ -140,13 +140,12 @@ MVP는 기능 수보다 다음 경험을 우선한다.
 - iOS deployment target 26.0
 - Android minSdk 33, compileSdk·targetSdk 36
 - 로컬 저장, 서버·로그인·클라우드 동기화 없음
+- Flutter feature-first 구조와 `View → ViewModel → Repository → Service` 의존 방향
+- Pigeon 네이티브 브리지와 drift + SQLite 저장. 상세 계약과 마이그레이션 전략은 `docs/architecture.md`를 따름
 - 프로젝트 밖에서도 재사용 가능한 Flutter 개발 규칙은 실제 적용으로 검증한 뒤 `marcorable-kit`에 정리
 
-### 미정 — 후속 Issue에서 결정
+### 후속 Issue에서 결정
 
-- Flutter feature-first 디렉터리와 상태 관리 경계: #23
-- 네이티브 브리지 방식(MethodChannel 또는 Pigeon): #23
-- 로컬 저장 기술과 마이그레이션 전략: #23·#28
 - Android 시스템 STT 최종 채택 여부: #12
 - 디자인 토큰: #20
 

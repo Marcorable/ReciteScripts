@@ -23,10 +23,10 @@
 - Flutter stable 버전을 고정하고 Android Studio를 주 IDE로 사용한다. Xcode는 iOS 빌드·시뮬레이터·서명·배포에 병행한다.
 - 최소 지원 버전은 iOS 26+와 Android 13/API 33+다. 출시 후 iOS 18~25와 Android API 31~32 어댑터를 추가할 수 있게 경계를 유지한다.
 - STT: iOS는 `SpeechAnalyzer` + `SpeechTranscriber`, Android는 on-device `SpeechRecognizer`를 사용한다. 실행 시 권한, `ko-KR` 지원, 온디바이스 인식 가능 상태를 확인한다.
-- 플랫폼 STT의 부분 결과·최종 결과·오류·취소·앱 생명주기를 하나의 Dart 계약으로 정규화한다. 브리지 방식은 Issue #23에서 공식 문서와 타입 안전성을 기준으로 결정한다.
+- 플랫폼 STT의 부분 결과·최종 결과·오류·취소·앱 생명주기를 `docs/architecture.md`의 Dart 계약으로 정규화한다. 네이티브 브리지는 Pigeon의 platform-channel 방식을 사용하고 생성 타입을 Repository·ViewModel에 노출하지 않는다.
 - 커서는 **앞으로만** 간다. 현재 커서 이후 어절과만 유사도를 비교한다. 비교 전 공백·문장부호를 제거한다.
 - API 정보는 구현 전에 최신 공식 문서로 확인한다. 기억에 의존하지 않는다.
-- Flutter 프로젝트 구조와 네이티브 브리지 방식은 **미정**. Issue #23에서 Marco와 결정한다.
+- Flutter 프로젝트는 `docs/architecture.md`의 feature-first 구조와 `View → ViewModel → Repository → Service` 의존 방향을 따른다. 로컬 저장은 drift + SQLite를 사용하고 스키마 스냅샷과 마이그레이션 테스트를 함께 관리한다.
 
 ## 절대 하지 않는 일
 

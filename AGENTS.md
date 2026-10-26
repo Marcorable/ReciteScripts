@@ -8,7 +8,7 @@
 
 - 사용자가 직접 입력한 대본을 소리 내어 읽으면, 앱이 온디바이스 음성 인식으로 목소리를 따라가며 어절을 하이라이트하고, 끝까지 읽으면 남은 횟수를 줄여주는 iOS·Android 앱.
 - 이 프로젝트의 진짜 산출물은 앱이 아니라 **"AI로 앱을 출시하는 파이프라인"**이다. 기획 → 디자인 → 개발 → QA → 출시 → 운영 전 단계를 에이전트가 수행하고, Marco는 방향과 구조를 리뷰한다.
-- 기술: Flutter / Dart 단일 코드베이스와 Cupertino 스타일 UI. iOS 26+는 `SpeechAnalyzer` + `SpeechTranscriber`, Android 13/API 33+는 on-device `SpeechRecognizer`를 네이티브 어댑터로 사용한다. 로컬 저장만 사용하며 **서버는 없다.**
+- 기술: Flutter / Dart 단일 코드베이스와 Cupertino 스타일 UI. iOS 26+는 `SpeechAnalyzer` + `SpeechTranscriber`, Android 13/API 33+는 on-device `SpeechRecognizer`를 Pigeon 네이티브 어댑터로 사용한다. 로컬 저장은 drift + SQLite이며 **서버는 없다.**
 - 개발 환경: Android Studio를 주 IDE로 사용하고, iOS 빌드·시뮬레이터·서명·배포에는 Xcode를 병행한다.
 - 레포는 **Public**이다.
 
@@ -21,7 +21,7 @@
 | 3 | **실패 시 규칙** — 에이전트가 문제를 못 풀어도 Marco는 코드를 고치지 않는다. 프롬프트·규칙·스펙을 고치고, 그 사례를 `docs/log/`에 기록한다. | 확정 |
 | 4 | **리뷰 방식** — AI 1차 리뷰(Codex + CodeRabbit), Marco 2차 리뷰(구조·방향). Marco는 PR 코멘트만 남기고 수정은 에이전트가 한다. | 확정 |
 | 5 | **교차 모델 리뷰** — 구현한 모델과 다른 모델이 리뷰한다 (Claude 구현 → Codex 리뷰, 또는 그 반대). | 확정 |
-| 6 | **프로젝트 구조** — Flutter UI·낭독 세션·매칭·저장·플랫폼 STT를 분리하고, 네이티브 STT는 교체 가능한 어댑터 경계 뒤에 둔다. | **미정** — Issue #23에서 세부 구조와 브리지 방식 결정 |
+| 6 | **프로젝트 구조** — `docs/architecture.md`의 feature-first 구조와 `View → ViewModel → Repository → Service` 의존 방향을 따른다. 낭독 세션·매칭은 순수 Dart로, 저장·플랫폼 STT는 교체 가능한 경계 뒤에 둔다. 네이티브 브리지는 Pigeon을 사용한다. | 확정 — Issue #23 |
 | 7 | **시크릿** — 서명 인증서, App Store Connect API 키는 레포 밖에 보관. 에이전트는 시크릿 파일을 읽거나 생성·커밋하지 않는다. 필요하면 `user` 라벨로 넘긴다. | 확정 |
 
 ### Marco가 코드를 직접 수정하지 않는다
