@@ -23,6 +23,7 @@
 | `color.text.secondary` | `CupertinoColors.secondaryLabel` | 자동 | 보조 설명, 대기 어절 |
 | `color.text.placeholder` | `CupertinoColors.placeholderText` | 자동 | 입력 placeholder에만 사용 |
 | `color.action.primary` | `CupertinoColors.systemBlue` | 밝기·고대비 자동 | 주요 조작, 현재 어절 강조 |
+| `color.action.text` | brand blue의 고대비 동적 톤 | 모드별 정의 | 흰 배경의 17pt 텍스트 조작. 밝은 모드 목업은 `#0060CC` |
 | `color.action.destructive` | `CupertinoColors.systemRed` | 밝기·고대비 자동 | 삭제처럼 파괴적인 조작 |
 | `color.separator` | `CupertinoColors.separator` | 자동 | 배경이 비치는 1 logical pixel 구분선 |
 | `color.separator.opaque` | `CupertinoColors.opaqueSeparator` | 자동 | 배경을 비치면 안 되는 경계 |
@@ -45,6 +46,7 @@
 
 - 모든 텍스트/배경 조합을 **밝은 모드, 어두운 모드, 대비 증가 모드**에서 각각 확인한다.
 - 17pt 이하 일반 텍스트는 최소 `4.5:1`, 18pt 이상 또는 굵은 글자는 최소 `3:1`을 통과해야 한다. 작은 커스텀 텍스트에는 가능하면 `7:1`을 목표로 한다.
+- `color.action.primary`는 채워진 버튼 배경에 사용하고, 흰 배경의 일반 굵기 조작 문구에는 같은 brand blue의 고대비 톤인 `color.action.text`를 사용한다. 이는 새 브랜드 색이 아니라 접근성용 tonal role이다.
 - 동적 `systemIndigo` 위 흰색인 현재 어절 조합도 작은 텍스트용으로 재사용하지 않는다. `color.word.current.text`는 아래의 24pt·600 굵기 낭독 본문에 한정한다.
 - 의미 색의 투명도를 추가로 낮춰 대비를 훼손하지 않는다. 비활성/대기 상태는 시스템 의미 색과 형태·굵기로 표현한다.
 - 상태 확인은 흑백 또는 색상 필터에서도 수행한다. 색을 제거해도 현재 어절의 캡슐·굵기와 완료 어절의 굵기가 남아야 한다.
