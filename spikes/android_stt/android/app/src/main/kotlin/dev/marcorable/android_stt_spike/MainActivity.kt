@@ -24,6 +24,7 @@ class MainActivity : FlutterActivity(), RecognitionListener {
     private var recognizer: SpeechRecognizer? = null
     private var eventSink: EventChannel.EventSink? = null
     private var pendingStart = false
+    private var recognitionActive = false
     private var lastRmsEventAt = 0L
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -36,16 +37,24 @@ class MainActivity : FlutterActivity(), RecognitionListener {
                     result.success(null)
                 }
                 "stop" -> {
+                    pendingStart = false
+                    recognitionActive = false
                     recognizer?.stopListening()
                     result.success(null)
                 }
                 "cancel" -> {
+                    pendingStart = false
+                    recognitionActive = false
                     recognizer?.cancel()
                     result.success(null)
                 }
                 "checkSupport" -> checkSupport(result)
                 "downloadModel" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (recognitionActive) {
+                            result.error("busy", "인식 중에는 모델을 다운로드할 수 없습니다.", null)
+                            return@setMethodCallHandler
+                        }
                         if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
                             result.error("unavailable", "온디바이스 인식을 사용할 수 없습니다.", null)
                             return@setMethodCallHandler
@@ -108,6 +117,7 @@ class MainActivity : FlutterActivity(), RecognitionListener {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERMISSION_REQUEST)
             return
         }
+        pendingStart = false
         if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
             emit("error", error = "온디바이스 음성 인식 서비스를 사용할 수 없습니다.")
             return
@@ -115,6 +125,7 @@ class MainActivity : FlutterActivity(), RecognitionListener {
         recognizer?.destroy()
         recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(this).also {
             it.setRecognitionListener(this)
+            recognitionActive = true
             it.startListening(recognitionIntent())
         }
         emit("starting")
@@ -185,9 +196,15 @@ class MainActivity : FlutterActivity(), RecognitionListener {
     }
     override fun onBufferReceived(buffer: ByteArray?) {}
     override fun onEndOfSpeech() = emit("speechEnd")
-    override fun onError(error: Int) = emit("error", error = errorName(error), code = error)
+    override fun onError(error: Int) {
+        recognitionActive = false
+        emit("error", error = errorName(error), code = error)
+    }
     override fun onPartialResults(partialResults: Bundle?) = emitResults("partial", partialResults)
-    override fun onResults(results: Bundle?) = emitResults("final", results)
+    override fun onResults(results: Bundle?) {
+        recognitionActive = false
+        emitResults("final", results)
+    }
     override fun onEvent(eventType: Int, params: Bundle?) {}
 
     private fun emitResults(type: String, bundle: Bundle?) {
@@ -225,6 +242,8 @@ class MainActivity : FlutterActivity(), RecognitionListener {
     }
 
     override fun onDestroy() {
+        pendingStart = false
+        recognitionActive = false
         recognizer?.cancel()
         recognizer?.destroy()
         recognizer = null

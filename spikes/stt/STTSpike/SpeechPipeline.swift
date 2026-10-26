@@ -126,6 +126,7 @@ actor SpeechPipeline {
     func stop() async {
         stopRequested = true
         guard let running else { return }
+        self.running = nil
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
         running.input.finish()
@@ -134,7 +135,6 @@ actor SpeechPipeline {
         } catch {
             events.yield(.failed("종료 오류: \(error)"))
         }
-        self.running = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         events.yield(.status("정지됨"))
     }

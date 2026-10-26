@@ -88,6 +88,11 @@ final class SpikeModel {
         if isRunning { stop() } else { start() }
     }
 
+    func stopForLifecycle() {
+        guard isRunning else { return }
+        stop()
+    }
+
     func resetSession() {
         session = ReadingSession(
             matcher: CursorMatcher(

@@ -2,6 +2,7 @@ import ScriptTracker
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model = SpikeModel()
     @State private var showLog = false
 
@@ -35,6 +36,11 @@ struct ContentView: View {
             }
         }
         .task { await model.checkSupport() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                model.stopForLifecycle()
+            }
+        }
     }
 
     private var statusHeader: some View {
