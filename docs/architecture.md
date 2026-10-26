@@ -252,9 +252,9 @@ iOS 26+ 구현은 `SpeechAnalyzer`와 `SpeechTranscriber`를 사용한다.
 Android 13/API 33+ 구현은 시스템의 on-device `SpeechRecognizer`만 사용한다.
 
 1. `RECORD_AUDIO` 권한과 `SpeechRecognizer.isOnDeviceRecognitionAvailable(context)`를 확인한다. false이면 일반 `createSpeechRecognizer`로 폴백하지 않는다.
-2. 메인 스레드에서 `createOnDeviceSpeechRecognizer`, `setRecognitionListener`, `startListening`을 호출한다.
-3. 요청 Intent는 `ko-KR`, free-form language model, partial results, offline preference를 지정한다. extra는 서비스가 무시할 수 있으므로 이것만으로 온디바이스 동작을 주장하지 않는다.
-4. API 33 `checkRecognitionSupport`로 언어의 설치·지원 상태를 구분하고 필요하면 `triggerModelDownload`를 호출한다. 실제 비행기 모드 검증은 Issue #36의 출시 게이트로 유지한다.
+2. 요청 Intent는 `ko-KR`, free-form language model, partial results, offline preference를 지정한다. extra는 서비스가 무시할 수 있으므로 이것만으로 온디바이스 동작을 주장하지 않는다.
+3. API 33 `checkRecognitionSupport`로 언어의 설치·지원 상태를 구분하고 필요하면 `triggerModelDownload`를 호출한다. 실제 비행기 모드 검증은 Issue #36의 출시 게이트로 유지한다.
+4. 준비가 완료된 뒤 메인 스레드에서 `createOnDeviceSpeechRecognizer`, `setRecognitionListener`, `startListening`을 호출한다.
 5. `onReadyForSpeech`는 `ready`, `onPartialResults`는 `partial`, `onResults`는 `finalResult`, `onError`는 정규화된 `failure`로 변환한다. RMS와 원시 오디오 이벤트는 Dart로 보내거나 저장하지 않는다.
 6. 한 recognizer에는 한 활성 native session만 둔다. `startListening` 후 `onResults` 또는 `onError`가 올 때까지 같은 recognizer에서 다시 시작하지 않는다.
 7. 사용자의 나가기는 `cancel()`이고, `stopListening()`은 발화 종료 후 결과를 요구하는 경우에만 사용한다. cancel/terminal callback 뒤 새 generation으로 재시작한다.
