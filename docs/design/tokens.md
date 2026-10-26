@@ -29,7 +29,7 @@
 | `color.fill.control` | `CupertinoColors.secondarySystemFill` | 자동 | 보조 컨트롤 배경 |
 | `color.word.current.fill` | `CupertinoColors.systemIndigo` | 밝기·고대비 자동 | 현재 어절 캡슐 배경. 흰 글자와 모드별 3:1 이상 대비 확보 |
 | `color.word.current.text` | `CupertinoColors.white` | 동일 | 현재 어절 글자. 읽기 본문 크기에서만 사용 |
-| `color.word.completed.text` | `CupertinoColors.label` | 자동 | 완료 어절 글자 |
+| `color.word.completed.text` | `CupertinoColors.systemIndigo` | 밝기·고대비 자동 | 완료 어절 글자. 현재 어절과 같은 진행 색상군 |
 | `color.word.pending.text` | `CupertinoColors.secondaryLabel` | 자동 | 대기 어절 글자 |
 
 `CupertinoThemeData`에는 값의 복제를 피하기 위해 최소 항목만 지정한다.
@@ -47,7 +47,7 @@
 - 17pt 이하 일반 텍스트는 최소 `4.5:1`, 18pt 이상 또는 굵은 글자는 최소 `3:1`을 통과해야 한다. 작은 커스텀 텍스트에는 가능하면 `7:1`을 목표로 한다.
 - 동적 `systemIndigo` 위 흰색인 현재 어절 조합도 작은 텍스트용으로 재사용하지 않는다. `color.word.current.text`는 아래의 24pt·600 굵기 낭독 본문에 한정한다.
 - 의미 색의 투명도를 추가로 낮춰 대비를 훼손하지 않는다. 비활성/대기 상태는 시스템 의미 색과 형태·굵기로 표현한다.
-- 상태 확인은 흑백 또는 색상 필터에서도 수행한다. 색을 제거해도 현재 어절의 캡슐·굵기와 완료 어절의 밑줄이 남아야 한다.
+- 상태 확인은 흑백 또는 색상 필터에서도 수행한다. 색을 제거해도 현재 어절의 캡슐·굵기와 완료 어절의 굵기가 남아야 한다.
 
 현재 어절의 `systemIndigo`/흰색 조합은 Flutter가 정의한 네 동적 색상 값으로 WCAG 상대 휘도 공식을 적용했다.
 
@@ -137,13 +137,13 @@
 | 상태 | 글자 | 면·선 | 색 외 시각 단서 | Semantics 값 |
 |---|---|---|---|---|
 | 현재 | `type.reading.current`, `color.word.current.text` | `color.word.current.fill` 캡슐, `space.2`/`space.3` 내부 여백 | 굵기 600 + 캡슐 형태 | `현재 어절, {어절}` |
-| 완료 | `type.reading`, `color.word.completed.text` | 배경 없음, 글자 아래 `stroke.state` 실선 | 밑줄 | `완료한 어절, {어절}` |
+| 완료 | `type.reading.current`, `color.word.completed.text` | 배경·선 없음 | 굵기 600 | `완료한 어절, {어절}` |
 | 대기 | `type.reading`, `color.word.pending.text` | 배경·선 없음 | 현재/완료보다 낮은 강조, 장식 없음 | `대기 중인 어절, {어절}` |
 
 추가 규칙:
 
-- 밑줄과 캡슐은 원문의 글자나 어절 사이 공백을 바꾸지 않는 장식이어야 한다.
-- 완료 상태에 취소선이나 낮은 opacity를 쓰지 않는다. 사용자가 문장을 다시 읽을 수 있도록 글자 형태와 대비를 보존한다.
+- 굵기·글자색·캡슐 표현은 원문의 글자나 어절 사이 공백을 바꾸지 않아야 한다.
+- 완료 상태에 취소선이나 낮은 opacity를 쓰지 않는다. `systemIndigo`와 굵기 600으로 왼쪽부터 진행 구간이 채워지는 노래방식 흐름을 만들고, 사용자가 문장을 다시 읽을 수 있도록 글자 형태와 대비를 보존한다.
 - `Semantics`는 상태가 바뀐 현재 어절을 알 수 있게 하되, 모든 어절 변화마다 과도한 별도 음성 안내가 반복되지 않도록 실제 기기에서 VoiceOver·TalkBack 흐름을 검증한다.
 - 현재 어절 변경은 색 변화뿐 아니라 위 세 속성(굵기, 캡슐, 의미 값)이 같은 프레임에 갱신되어야 한다.
 
@@ -184,7 +184,7 @@
 - [ ] iOS Dynamic Type 전 단계와 특히 Accessibility XL에서 잘림·겹침이 없다.
 - [ ] iOS Accessibility XXL·XXXL, Android 최대 200% 글꼴 크기에서도 핵심 정보와 조작을 사용할 수 있다.
 - [ ] 모든 조작의 hit region이 iOS 44pt, Android 48dp 이상이다.
-- [ ] 흑백 화면에서도 현재·완료·대기 어절을 캡슐·밑줄·무장식으로 구분한다.
+- [ ] 흑백 화면에서도 현재·완료·대기 어절을 캡슐·굵기·일반 굵기로 구분한다.
 - [ ] VoiceOver·TalkBack이 어절 상태와 조작 이름을 의미 있게 읽는다.
 - [ ] Reduce Motion에서 자동 스크롤과 상태 애니메이션이 즉시 전환 또는 짧은 fade로 축소된다.
 - [ ] 기본 글씨와 큰 글씨 화면을 양 플랫폼에서 스크린샷으로 비교한다.
@@ -207,4 +207,4 @@
 
 ## 10. Marco 결정 필요 항목
 
-없음. 이 문서는 확정된 접근성 요구와 공식 시스템 기본값을 구현 가능한 최소 토큰으로 옮긴다. 24pt 낭독 본문과 완료 어절 밑줄은 #21 목업에서 기본·Accessibility XL 화면으로 시각 검증한 뒤 조정할 수 있다.
+없음. 이 문서는 확정된 접근성 요구와 공식 시스템 기본값을 구현 가능한 최소 토큰으로 옮긴다. 24pt 낭독 본문과 완료 어절의 굵은 `systemIndigo` 표현은 #21 목업의 기본·Accessibility XL 화면에서 시각 검증한다.
