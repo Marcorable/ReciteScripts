@@ -145,11 +145,12 @@ struct ContentView: View {
                     .disabled(model.isRunning)
             }
             HStack(spacing: 12) {
-                Button(model.isRunning ? "정지" : "시작", systemImage: model.isRunning ? "stop.fill" : "mic.fill") {
+                Button(model.isStopping ? "정지 중…" : (model.isRunning ? "정지" : "시작"), systemImage: model.isRunning ? "stop.fill" : "mic.fill") {
                     model.toggle()
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(model.isRunning ? .red : .accentColor)
+                .disabled(model.isStopping)
                 Button("다음 어절", systemImage: "arrow.right") { model.advanceManually() }
                     .buttonStyle(.bordered)
                 Button("처음부터", systemImage: "arrow.counterclockwise") { model.resetSession() }

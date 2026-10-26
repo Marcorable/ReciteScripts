@@ -55,6 +55,8 @@ if useDictation || !SpeechTranscriber.isAvailable {
 }
 let transcriber: any SpeechModule = modern.map { $0 as any SpeechModule } ?? dictation!
 let status = await AssetInventory.status(forModules: [transcriber])
+let highPriority = arguments.contains("--priority")
+let hintsAtInit = arguments.contains("--hints-init")
 print("모델 상태 \(status) · fast=\(useFast) hints=\(useHints || hintsAtInit) threshold=\(threshold) pace=\(pace) priority=\(arguments.contains("--priority"))")
 if status != .installed, let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
     print("모델 내려받는 중…")
@@ -63,8 +65,6 @@ if status != .installed, let request = try await AssetInventory.assetInstallatio
 }
 
 // 2. 분석기
-let highPriority = arguments.contains("--priority")
-let hintsAtInit = arguments.contains("--hints-init")
 let (inputSequence, inputBuilder) = AsyncStream.makeStream(of: AnalyzerInput.self)
 let hintContext = AnalysisContext()
 hintContext.contextualStrings = [.general: Array(Set(session.tokens.map(\.text)))]

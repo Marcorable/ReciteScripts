@@ -46,6 +46,10 @@ class MainActivity : FlutterActivity(), RecognitionListener {
                 "checkSupport" -> checkSupport(result)
                 "downloadModel" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
+                            result.error("unavailable", "온디바이스 인식을 사용할 수 없습니다.", null)
+                            return@setMethodCallHandler
+                        }
                         recognizer?.destroy()
                         recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(this).also {
                             it.setRecognitionListener(this)

@@ -33,6 +33,7 @@ actor SpeechPipeline {
     /// 지금까지 분석기에 넣은 오디오 길이(초). 결과의 `range.end`와 비교해 지연을 잰다.
     private let audioFed = AudioClock()
     private var running: RunningState?
+    private var stopRequested = false
 
     private struct RunningState {
         let analyzer: SpeechAnalyzer
@@ -71,6 +72,7 @@ actor SpeechPipeline {
     // MARK: - 시작·정지
 
     func start() async throws {
+        stopRequested = false
         guard await requestMicrophonePermission() else {
             throw PipelineError.microphoneDenied
         }
@@ -112,12 +114,17 @@ actor SpeechPipeline {
         running = RunningState(analyzer: analyzer, input: inputBuilder, resultsTask: resultsTask)
 
         try await analyzer.start(inputSequence: inputSequence)
+        guard !stopRequested else {
+            await stop()
+            return
+        }
         engine.prepare()
         try engine.start()
         events.yield(.status("듣는 중"))
     }
 
     func stop() async {
+        stopRequested = true
         guard let running else { return }
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)

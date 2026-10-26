@@ -37,6 +37,7 @@ final class SpikeModel {
     // 상태
     private(set) var session: ReadingSession
     private(set) var isRunning = false
+    private(set) var isStopping = false
     private(set) var status = "대기"
     private(set) var localeReport = "확인 중…"
     private(set) var formatReport = "—"
@@ -83,6 +84,7 @@ final class SpikeModel {
     }
 
     func toggle() {
+        guard !isStopping else { return }
         if isRunning { stop() } else { start() }
     }
 
@@ -105,6 +107,8 @@ final class SpikeModel {
     }
 
     private func start() {
+        eventTask?.cancel()
+        eventTask = nil
         resetSession()
         let (events, continuation) = AsyncStream.makeStream(of: PipelineEvent.self)
         var options = SpeechPipeline.Options()
@@ -131,17 +135,27 @@ final class SpikeModel {
             } catch {
                 append("시작 실패: \(error.localizedDescription)")
                 status = "오류: \(error.localizedDescription)"
+                await pipeline.stop()
+                if self.pipeline === pipeline {
+                    self.pipeline = nil
+                    eventTask?.cancel()
+                    eventTask = nil
+                }
                 isRunning = false
             }
         }
     }
 
     private func stop() {
-        guard let pipeline else { return }
-        isRunning = false
+        guard let pipeline, !isStopping else { return }
+        isStopping = true
+        self.pipeline = nil
+        eventTask?.cancel()
+        eventTask = nil
         Task {
             await pipeline.stop()
-            self.pipeline = nil
+            isStopping = false
+            isRunning = false
         }
     }
 
@@ -175,7 +189,16 @@ final class SpikeModel {
         case .failed(let message):
             status = message
             append(message)
-            isRunning = false
+            let failedPipeline = pipeline
+            pipeline = nil
+            eventTask?.cancel()
+            eventTask = nil
+            isStopping = failedPipeline != nil
+            Task {
+                await failedPipeline?.stop()
+                isStopping = false
+                isRunning = false
+            }
         case .finished:
             append("결과 스트림 종료")
         }
