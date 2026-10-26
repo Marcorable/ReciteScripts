@@ -150,10 +150,11 @@ final class SpikeModel {
         guard let pipeline, !isStopping else { return }
         isStopping = true
         self.pipeline = nil
-        eventTask?.cancel()
+        let stoppingEventTask = eventTask
         eventTask = nil
         Task {
             await pipeline.stop()
+            stoppingEventTask?.cancel()
             isStopping = false
             isRunning = false
         }
