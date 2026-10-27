@@ -81,16 +81,16 @@ final class IosSpeechSession {
 
   func cancel(emitEvent: Bool) async {
     if acceptsEvents {
-      if emitEvent { await emit(kind: .cancelled) }
       acceptsEvents = false
+      if emitEvent { await emitUnchecked(kind: .cancelled) }
     }
     await cleanUp(finalize: false)
   }
 
   func fail(code: NativeSttFailureCode, retryable: Bool) async {
     if acceptsEvents {
-      await emit(kind: .failure, failureCode: code, retryable: retryable)
       acceptsEvents = false
+      await emitUnchecked(kind: .failure, failureCode: code, retryable: retryable)
     }
     await cleanUp(finalize: false)
     finishedHandler(self)
@@ -106,24 +106,24 @@ final class IosSpeechSession {
           await self.emit(kind: result.isFinal ? .finalResult : .partial, text: text)
         }
         guard let self, self.acceptsEvents else { return }
+        self.acceptsEvents = false
         if self.conversionFailed.value {
-          await self.emit(
+          await self.emitUnchecked(
             kind: .failure,
             failureCode: .audioFormatMismatch,
             retryable: false
           )
         } else {
-          await self.emit(kind: .ended)
+          await self.emitUnchecked(kind: .ended)
         }
-        self.acceptsEvents = false
         await self.cleanUp(finalize: false)
         self.finishedHandler(self)
       } catch is CancellationError {
         return
       } catch {
         guard let self, self.acceptsEvents else { return }
-        await self.emit(kind: .failure, failureCode: .unknown, retryable: true)
         self.acceptsEvents = false
+        await self.emitUnchecked(kind: .failure, failureCode: .unknown, retryable: true)
         await self.cleanUp(finalize: false)
         self.finishedHandler(self)
       }
@@ -168,6 +168,20 @@ final class IosSpeechSession {
     retryable: Bool? = nil
   ) async {
     guard acceptsEvents else { return }
+    await emitUnchecked(
+      kind: kind,
+      text: text,
+      failureCode: failureCode,
+      retryable: retryable
+    )
+  }
+
+  private func emitUnchecked(
+    kind: NativeSttEventKind,
+    text: String? = nil,
+    failureCode: NativeSttFailureCode? = nil,
+    retryable: Bool? = nil
+  ) async {
     sequence += 1
     await eventHandler(
       NativeSttEvent(

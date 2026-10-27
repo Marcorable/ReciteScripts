@@ -51,8 +51,11 @@ final class PigeonSttService implements SttService, pigeon.NativeSttFlutterApi {
       throw ArgumentError('sessionId와 locale은 비어 있을 수 없습니다.');
     }
     final previous = _activeGenerations[request.sessionId];
-    if (previous != null && request.generation <= previous) {
-      throw StateError('generation은 이전 값보다 커야 합니다.');
+    if (previous != null) {
+      if (request.generation <= previous) {
+        throw StateError('generation은 이전 값보다 커야 합니다.');
+      }
+      throw const SttStartException(SttFailureCode.busy);
     }
 
     _activeGenerations[request.sessionId] = request.generation;

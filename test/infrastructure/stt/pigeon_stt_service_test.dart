@@ -147,6 +147,55 @@ void main() {
     await service.dispose();
   });
 
+  test('실행 중인 session의 새 start 거부가 기존 generation을 보존한다', () async {
+    setHostHandler('start', (_) => ok(null));
+    final service = PigeonSttService();
+    final events = <SttEvent>[];
+    final subscription = service.events('session').listen(events.add);
+    await service.start(
+      const SttStartRequest(
+        sessionId: 'session',
+        generation: 1,
+        locale: 'ko-KR',
+      ),
+    );
+
+    await expectLater(
+      service.start(
+        const SttStartRequest(
+          sessionId: 'session',
+          generation: 2,
+          locale: 'ko-KR',
+        ),
+      ),
+      throwsA(
+        isA<SttStartException>().having(
+          (exception) => exception.code,
+          'code',
+          SttFailureCode.busy,
+        ),
+      ),
+    );
+    await messenger.handlePlatformMessage(
+      'dev.flutter.pigeon.maltto.NativeSttFlutterApi.onEvent',
+      codec.encodeMessage(<Object?>[
+        pigeon.NativeSttEvent(
+          sessionId: 'session',
+          generation: 1,
+          sequence: 1,
+          kind: pigeon.NativeSttEventKind.partial,
+          text: '직접 쓴 테스트 문장',
+        ),
+      ]),
+      (_) {},
+    );
+    await pumpEventQueue();
+
+    expect(events.single.generation, 1);
+    await subscription.cancel();
+    await service.dispose();
+  });
+
   test('종료된 generation의 늦은 결과와 빈 전사를 버린다', () async {
     setHostHandler('start', (_) => ok(null));
     final service = PigeonSttService();
