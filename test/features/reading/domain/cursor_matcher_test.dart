@@ -35,6 +35,14 @@ void main() {
       expect(matcher.match(hypothesis: '오', anchor: 0), isNull);
     });
 
+    test('현재 위치의 짧은 어절은 정확히 일치할 때만 허용한다', () {
+      final matcher = CursorMatcher.fromScript('길게 읽고 나');
+
+      expect(matcher.match(hypothesis: '나', anchor: 2)?.cursor, 3);
+      expect(matcher.match(hypothesis: '너', anchor: 2), isNull);
+      expect(matcher.match(hypothesis: '나', anchor: 0), isNull);
+    });
+
     test('현재 앵커 이후에서만 반복 어절을 찾는다', () {
       final matcher = CursorMatcher.fromScript('가나다 라마바 가나다 라마바 사아자');
 

@@ -63,6 +63,25 @@ void main() {
       expect(progress.cursor, 2);
     });
 
+    test('불일치 final 누적 뒤 새 final 단독 매칭으로 복귀한다', () {
+      final progress = createProgress();
+      progress.acceptTranscript(
+        '오늘 아침에는 창문을 열고 바깥 공기를 천천히',
+        TranscriptKind.finalResult,
+      );
+      expect(progress.cursor, 7);
+
+      progress.acceptTranscript('점심 메뉴를 고른다', TranscriptKind.finalResult);
+      final completed = progress.acceptTranscript(
+        '마셨다',
+        TranscriptKind.finalResult,
+      );
+
+      expect(completed.cursor, 8);
+      expect(completed.repetitionCompleted, isTrue);
+      expect(progress.pendingFinalText, isEmpty);
+    });
+
     test('명시적인 한 어절 뒤로 명령만 커서를 감소시킨다', () {
       final progress = createProgress();
       progress.acceptTranscript('오늘 아침에는 창문을', TranscriptKind.finalResult);
@@ -72,11 +91,33 @@ void main() {
       expect(update.previousCursor, 3);
       expect(update.cursor, 2);
       expect(progress.anchor, 2);
+      expect(progress.requiresTranscriptReset, isTrue);
       progress.moveBackOneWord();
       progress.moveBackOneWord();
       final atStart = progress.moveBackOneWord();
       expect(atStart.cursor, 0);
       expect(atStart.cursorChanged, isFalse);
+    });
+
+    test('후퇴 전 전사는 무시하고 새 전사 구간에서 추적을 재개한다', () {
+      final progress = createProgress();
+      progress.acceptTranscript(
+        '오늘 아침에는 창문을 열고 바깥 공기를 천천히',
+        TranscriptKind.partial,
+      );
+      progress.moveBackOneWord();
+
+      final stale = progress.acceptTranscript(script, TranscriptKind.partial);
+      expect(stale.cursor, 6);
+      expect(stale.cursorChanged, isFalse);
+
+      progress.beginNewTranscriptSegment();
+      final resumed = progress.acceptTranscript(
+        '천천히 마셨다',
+        TranscriptKind.finalResult,
+      );
+      expect(resumed.cursor, 8);
+      expect(resumed.repetitionCompleted, isTrue);
     });
 
     test('마지막 어절 완료 이벤트를 한 번만 만든다', () {
@@ -94,6 +135,19 @@ void main() {
       expect(progress.isComplete, isTrue);
       expect(completed.repetitionCompleted, isTrue);
       expect(duplicate.repetitionCompleted, isFalse);
+    });
+
+    test('짧은 단일 어절도 정확히 읽으면 완료한다', () {
+      final progress = ReadingProgress(matcher: CursorMatcher.fromScript('나'));
+
+      final completed = progress.acceptTranscript(
+        '나',
+        TranscriptKind.finalResult,
+      );
+
+      expect(completed.cursor, 1);
+      expect(completed.repetitionCompleted, isTrue);
+      expect(progress.isComplete, isTrue);
     });
 
     test('반복 경계에서 전사 상태와 커서를 초기화한다', () {

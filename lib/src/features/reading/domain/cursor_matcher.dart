@@ -53,10 +53,18 @@ final class CursorMatcher {
 
   CursorMatch? match({required String hypothesis, required int anchor}) {
     final hypothesisUnits = TextNormalizer.units(hypothesis);
-    if (hypothesisUnits.length < policy.minimumHypothesisUnits ||
-        anchor < 0 ||
-        anchor >= tokens.length) {
+    if (anchor < 0 || anchor >= tokens.length) {
       return null;
+    }
+    if (hypothesisUnits.length < policy.minimumHypothesisUnits) {
+      final currentUnits = tokens[anchor].units;
+      return _unitsEqual(hypothesisUnits, currentUnits)
+          ? CursorMatch(
+              cursor: anchor + 1,
+              normalizedDistance: 0,
+              skippedTokens: 0,
+            )
+          : null;
     }
 
     CursorMatch? best;
@@ -138,5 +146,13 @@ final class CursorMatcher {
   static int _minimum(int first, int second, int third) {
     final pair = first < second ? first : second;
     return pair < third ? pair : third;
+  }
+
+  static bool _unitsEqual(List<int> first, List<int> second) {
+    if (first.length != second.length) return false;
+    for (var index = 0; index < first.length; index++) {
+      if (first[index] != second[index]) return false;
+    }
+    return true;
   }
 }
