@@ -11,6 +11,9 @@
 - `AVAudioEngine` 입력 포맷과 `bestAvailableAudioFormat`이 다르면 `AVAudioConverter`로 변환한다. 변환기를 만들 수 없으면 `audioFormatMismatch`로 시작을 거부한다.
 - volatile/final 결과와 ready/ended/failure/cancelled를 session ID, generation, 단조 증가 sequence와 함께 전달한다.
 - 취소·dispose·백그라운드 전환 시 이벤트 발행을 차단하고 audio tap, 입력 stream, 결과 Task, analyzer, audio session을 정리한다.
+- 시작 예약을 첫 비동기 작업 전에 잡고 각 비동기 경계 뒤에 취소 여부를 다시 확인해, 준비 중 cancel과 동시 start가 마이크를 고아 상태로 남기지 않게 한다.
+- 전화·Siri 등 오디오 interruption과 media-services reset은 재시도 가능한 `interrupted` failure로 세션을 종료한다.
+- 실행 중 오디오 변환 실패는 정상 `ended`가 아니라 재시도 불가능한 `audioFormatMismatch` failure로 전달한다.
 - 종료된 generation, 중복 sequence, 빈 부분/최종 전사는 Dart 경계에서 폐기한다.
 - 원시 오디오와 RMS는 Dart로 전달하지 않고, 오디오 파일을 만들거나 네트워크로 전송하지 않는다.
 
@@ -26,6 +29,7 @@ Apple 문서상 `SpeechAnalyzer`의 transcriber는 음성을 Apple 서버로 전
 | 항목 | 결과 |
 |---|---|
 | Dart 구조화 계약 | 권한 거부, 모델 미설치, 오디오 포맷 불일치 failure 매핑 테스트 통과 |
+| Dart 시작 오류 | Pigeon `PlatformException`을 플랫폼 중립 `SttStartException`으로 변환하는 테스트 통과 |
 | generation 방어 | cancel 뒤 도착한 이전 generation 결과와 빈 전사 폐기 테스트 통과 |
 | iOS XCTest | iPhone 17 Pro / iOS 26.3.1 대상 `xcodebuild test` 통과 |
 | iOS SDK 컴파일 | Xcode 26.2 / iOS Simulator SDK 26.2에서 Debug 빌드 통과 |

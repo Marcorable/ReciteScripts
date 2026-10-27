@@ -21,6 +21,8 @@ final class IosSpeechSession {
   private var sequence: Int64 = 0
   private var acceptsEvents = true
   private var tapInstalled = false
+  private var cleanupStarted = false
+  private let conversionFailed = ThreadSafeFlag()
 
   init(
     sessionId: String,
@@ -46,6 +48,7 @@ final class IosSpeechSession {
     try audioSession.setActive(true)
 
     let analyzer = SpeechAnalyzer(modules: [transcriber])
+    self.analyzer = analyzer
     let inputFormat = engine.inputNode.outputFormat(forBus: 0)
     guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
       throw IosSpeechError.audio
@@ -56,15 +59,17 @@ final class IosSpeechSession {
     ) else {
       throw IosSpeechError.audioFormatMismatch
     }
+    try ensureActive()
     try await analyzer.prepareToAnalyze(in: targetFormat)
+    try ensureActive()
 
     let (inputSequence, continuation) = AsyncStream.makeStream(of: AnalyzerInput.self)
     try installTap(inputFormat: inputFormat, targetFormat: targetFormat, continuation: continuation)
-    self.analyzer = analyzer
     inputContinuation = continuation
     resultsTask = consumeResults()
 
     try await analyzer.start(inputSequence: inputSequence)
+    try ensureActive()
     engine.prepare()
     do {
       try engine.start()
@@ -81,6 +86,14 @@ final class IosSpeechSession {
     await cleanUp(finalize: false)
   }
 
+  func fail(code: NativeSttFailureCode, retryable: Bool) async {
+    guard acceptsEvents else { return }
+    await emit(kind: .failure, failureCode: code, retryable: retryable)
+    acceptsEvents = false
+    await cleanUp(finalize: false)
+    finishedHandler(self)
+  }
+
   private func consumeResults() -> Task<Void, Never> {
     Task { [weak self, transcriber] in
       do {
@@ -91,7 +104,15 @@ final class IosSpeechSession {
           await self.emit(kind: result.isFinal ? .finalResult : .partial, text: text)
         }
         guard let self, self.acceptsEvents else { return }
-        await self.emit(kind: .ended)
+        if self.conversionFailed.value {
+          await self.emit(
+            kind: .failure,
+            failureCode: .audioFormatMismatch,
+            retryable: false
+          )
+        } else {
+          await self.emit(kind: .ended)
+        }
         self.acceptsEvents = false
         await self.cleanUp(finalize: false)
         self.finishedHandler(self)
@@ -122,9 +143,11 @@ final class IosSpeechSession {
       converter = made
     }
     let converterBox = AudioConverterBox(converter)
+    let conversionFailed = self.conversionFailed
     engine.inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, _ in
       if let converter = converterBox.converter {
         guard let converted = Self.convert(buffer, with: converter, to: targetFormat) else {
+          conversionFailed.set()
           continuation.finish()
           return
         }
@@ -158,6 +181,8 @@ final class IosSpeechSession {
   }
 
   private func cleanUp(finalize: Bool) async {
+    guard !cleanupStarted else { return }
+    cleanupStarted = true
     engine.stop()
     if tapInstalled {
       engine.inputNode.removeTap(onBus: 0)
@@ -168,9 +193,19 @@ final class IosSpeechSession {
     let task = resultsTask
     resultsTask = nil
     task?.cancel()
-    if finalize, let analyzer { try? await analyzer.finalizeAndFinishThroughEndOfInput() }
+    if let analyzer {
+      if finalize {
+        try? await analyzer.finalizeAndFinishThroughEndOfInput()
+      } else {
+        await analyzer.cancelAndFinishNow()
+      }
+    }
     self.analyzer = nil
     try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+  }
+
+  private func ensureActive() throws {
+    guard acceptsEvents else { throw CancellationError() }
   }
 
   private nonisolated static func convert(
@@ -209,4 +244,10 @@ private struct AudioBufferBox: @unchecked Sendable {
 private struct AudioConverterBox: @unchecked Sendable {
   let converter: AVAudioConverter?
   init(_ converter: AVAudioConverter?) { self.converter = converter }
+}
+
+private final class ThreadSafeFlag: Sendable {
+  private let storage = Mutex(false)
+  var value: Bool { storage.withLock { $0 } }
+  func set() { storage.withLock { $0 = true } }
 }

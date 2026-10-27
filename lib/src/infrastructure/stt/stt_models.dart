@@ -27,6 +27,15 @@ enum SttFailureCode {
   unknown,
 }
 
+final class SttStartException implements Exception {
+  const SttStartException(this.code);
+
+  final SttFailureCode code;
+
+  @override
+  String toString() => 'SttStartException(${code.name})';
+}
+
 final class SttAvailability {
   const SttAvailability({
     required this.microphonePermission,

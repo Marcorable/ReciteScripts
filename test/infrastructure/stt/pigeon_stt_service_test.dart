@@ -116,6 +116,37 @@ void main() {
     await service.dispose();
   });
 
+  test('네이티브 시작 오류를 플랫폼 중립 예외로 변환한다', () async {
+    setHostHandler(
+      'start',
+      (_) async => <Object?>[
+        'modelMissing',
+        'The on-device model is not installed.',
+        null,
+      ],
+    );
+    final service = PigeonSttService();
+
+    await expectLater(
+      service.start(
+        const SttStartRequest(
+          sessionId: 'session',
+          generation: 1,
+          locale: 'ko-KR',
+        ),
+      ),
+      throwsA(
+        isA<SttStartException>().having(
+          (exception) => exception.code,
+          'code',
+          SttFailureCode.modelMissing,
+        ),
+      ),
+    );
+
+    await service.dispose();
+  });
+
   test('종료된 generation의 늦은 결과와 빈 전사를 버린다', () async {
     setHostHandler('start', (_) => ok(null));
     final service = PigeonSttService();

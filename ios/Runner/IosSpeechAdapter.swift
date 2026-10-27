@@ -6,14 +6,25 @@ import UIKit
 
 @MainActor
 final class IosSpeechAdapter: NSObject, NativeSttHostApi {
+  private final class StartReservation {
+    let sessionId: String
+    let generation: Int64
+
+    init(sessionId: String, generation: Int64) {
+      self.sessionId = sessionId
+      self.generation = generation
+    }
+  }
+
   private let flutterApi: NativeSttFlutterApi
   private var activeSession: IosSpeechSession?
-  private var backgroundObserver: NSObjectProtocol?
+  private var pendingStart: StartReservation?
+  private var observers: [NSObjectProtocol] = []
 
   init(binaryMessenger: FlutterBinaryMessenger) {
     flutterApi = NativeSttFlutterApi(binaryMessenger: binaryMessenger)
     super.init()
-    backgroundObserver = NotificationCenter.default.addObserver(
+    observers.append(NotificationCenter.default.addObserver(
       forName: UIApplication.didEnterBackgroundNotification,
       object: nil,
       queue: .main
@@ -21,13 +32,33 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
       Task { @MainActor in
         await self?.cancelActiveSession(emitCancelled: true)
       }
-    }
+    })
+    observers.append(NotificationCenter.default.addObserver(
+      forName: AVAudioSession.interruptionNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] notification in
+      guard
+        let rawValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+        AVAudioSession.InterruptionType(rawValue: rawValue) == .began
+      else { return }
+      Task { @MainActor in
+        await self?.interruptActiveSession()
+      }
+    })
+    observers.append(NotificationCenter.default.addObserver(
+      forName: AVAudioSession.mediaServicesWereResetNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in
+        await self?.interruptActiveSession()
+      }
+    })
   }
 
   deinit {
-    if let backgroundObserver {
-      NotificationCenter.default.removeObserver(backgroundObserver)
-    }
+    observers.forEach(NotificationCenter.default.removeObserver)
   }
 
   func checkAvailability(locale: String) async throws -> NativeSttAvailability {
@@ -102,8 +133,16 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
   }
 
   func start(request: NativeSttStartRequest) async throws {
-    guard activeSession == nil else {
+    guard activeSession == nil, pendingStart == nil else {
       throw PigeonError(code: "busy", message: "An STT session is already active.", details: nil)
+    }
+    let reservation = StartReservation(
+      sessionId: request.sessionId,
+      generation: request.generation
+    )
+    pendingStart = reservation
+    defer {
+      if pendingStart === reservation { pendingStart = nil }
     }
     guard Self.microphonePermission() == .granted, Self.speechPermission() == .granted else {
       throw PigeonError(code: "permissionDenied", message: "STT permission is not granted.", details: nil)
@@ -113,12 +152,16 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
     }
     let requestedLocale = Locale(identifier: request.locale)
     guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
+      try ensurePending(reservation)
       throw PigeonError(code: "localeUnsupported", message: "The locale is unsupported.", details: nil)
     }
+    try ensurePending(reservation)
     let transcriber = Self.makeTranscriber(locale: locale)
     guard await AssetInventory.status(forModules: [transcriber]) == .installed else {
+      try ensurePending(reservation)
       throw PigeonError(code: "modelMissing", message: "The on-device model is not installed.", details: nil)
     }
+    try ensurePending(reservation)
 
     let session = IosSpeechSession(
       sessionId: request.sessionId,
@@ -132,6 +175,7 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
       self.activeSession = nil
     }
     activeSession = session
+    pendingStart = nil
     do {
       try await session.start()
     } catch {
@@ -142,11 +186,13 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
   }
 
   func cancel(sessionId: String) async throws {
+    if pendingStart?.sessionId == sessionId { pendingStart = nil }
     guard activeSession?.sessionId == sessionId else { return }
     await cancelActiveSession(emitCancelled: true)
   }
 
   func dispose() async throws {
+    pendingStart = nil
     await cancelActiveSession(emitCancelled: false)
   }
 
@@ -154,6 +200,17 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
     guard let session = activeSession else { return }
     await session.cancel(emitEvent: emitCancelled)
     if activeSession === session { activeSession = nil }
+  }
+
+  private func interruptActiveSession() async {
+    pendingStart = nil
+    guard let session = activeSession else { return }
+    await session.fail(code: .interrupted, retryable: true)
+    if activeSession === session { activeSession = nil }
+  }
+
+  private func ensurePending(_ reservation: StartReservation) throws {
+    guard pendingStart === reservation else { throw CancellationError() }
   }
 
   private static func makeTranscriber(locale: Locale) -> SpeechTranscriber {
@@ -212,6 +269,9 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
     if let error = error as? PigeonError { return error }
     if let error = error as? IosSpeechError {
       return PigeonError(code: error.code, message: error.message, details: nil)
+    }
+    if error is CancellationError {
+      return PigeonError(code: "cancelled", message: "The STT start was cancelled.", details: nil)
     }
     return PigeonError(code: "unknown", message: "The STT session failed.", details: nil)
   }

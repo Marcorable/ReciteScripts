@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
+
 import 'generated/stt_api.g.dart' as pigeon;
 import 'stt_models.dart';
 import 'stt_service.dart';
@@ -63,6 +65,15 @@ final class PigeonSttService implements SttService, pigeon.NativeSttFlutterApi {
           locale: request.locale,
         ),
       );
+    } on PlatformException catch (error) {
+      if (_activeGenerations[request.sessionId] == request.generation) {
+        _activeGenerations.remove(request.sessionId);
+        _lastSequences.remove(request.sessionId);
+      }
+      final code =
+          SttFailureCode.values.asNameMap()[error.code] ??
+          SttFailureCode.unknown;
+      throw SttStartException(code);
     } catch (_) {
       if (_activeGenerations[request.sessionId] == request.generation) {
         _activeGenerations.remove(request.sessionId);
