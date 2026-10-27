@@ -1,0 +1,20 @@
+name: maltto
+description: "사용자가 입력한 대본을 반복해서 낭독하도록 돕는 앱"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  cupertino_icons: ^1.0.8
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  test: ^1.26.3
+
+flutter:

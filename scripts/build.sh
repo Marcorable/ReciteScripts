@@ -6,4 +6,4 @@ echo "Android debug APK 빌드"
 run_flutter build apk --debug
 
 echo "iOS Simulator debug 빌드"
-run_flutter build ios --simulator --debug
+run_flutter build ios --simulator --debug --no-codesign

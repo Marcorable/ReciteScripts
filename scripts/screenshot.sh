@@ -18,12 +18,13 @@ capture_android() {
     local adb="${ADB:-$HOME/Library/Android/sdk/platform-tools/adb}"
     local device="${ANDROID_DEVICE_ID:-}"
     local apk="$FLUTTER_PROJECT/build/app/outputs/flutter-apk/app-debug.apk"
-    local app_id="${ANDROID_APP_ID:-com.marcorable.recite_buildcheck}"
+    local app_id="${ANDROID_APP_ID:-com.marcorable.maltto}"
 
     if [ ! -x "$adb" ]; then
         echo "adb를 찾을 수 없다: $adb" >&2
         return 1
     fi
+    "$adb" wait-for-device
     if [ -z "$device" ]; then
         device="$($adb devices | awk '$2 == "device" && $1 ~ /^emulator-/ {print $1; exit}')"
     fi
@@ -33,6 +34,20 @@ capture_android() {
     fi
     if [ ! -f "$apk" ]; then
         echo "Android 빌드 산출물이 없다. 먼저 ./scripts/build.sh를 실행한다" >&2
+        return 1
+    fi
+
+    local attempt boot_completed boot_animation
+    for attempt in {1..30}; do
+        boot_completed="$($adb -s "$device" shell getprop sys.boot_completed | tr -d '\r')"
+        boot_animation="$($adb -s "$device" shell getprop init.svc.bootanim | tr -d '\r')"
+        if [ "$boot_completed" = "1" ] && [ "$boot_animation" = "stopped" ]; then
+            break
+        fi
+        sleep 2
+    done
+    if [ "$boot_completed" != "1" ] || [ "$boot_animation" != "stopped" ]; then
+        echo "Android Emulator 부팅이 완료되지 않았다" >&2
         return 1
     fi
 

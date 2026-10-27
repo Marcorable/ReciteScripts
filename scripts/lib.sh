@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-FLUTTER_PROJECT="${FLUTTER_PROJECT:-$REPO_ROOT/spikes/flutter_buildcheck}"
+FLUTTER_PROJECT="${FLUTTER_PROJECT:-$REPO_ROOT}"
 OUTPUT_DIR="${OUTPUT_DIR:-$REPO_ROOT/.build/flutter-verification}"
 
 if [ ! -f "$FLUTTER_PROJECT/pubspec.yaml" ]; then
