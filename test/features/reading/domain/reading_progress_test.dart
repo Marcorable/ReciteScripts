@@ -37,6 +37,19 @@ void main() {
       expect(progress.anchor, 0);
     });
 
+    test('짧아진 final은 partial 커서가 아닌 확정 경계까지만 앵커를 옮긴다', () {
+      final progress = createProgress();
+      progress.acceptTranscript('오늘 아침에는 창문을 열고', TranscriptKind.partial);
+
+      progress.acceptTranscript('오늘', TranscriptKind.finalResult);
+      expect(progress.cursor, 4);
+      expect(progress.anchor, 1);
+
+      progress.acceptTranscript('아침에는 창문을 열고', TranscriptKind.finalResult);
+      expect(progress.cursor, 4);
+      expect(progress.anchor, 4);
+    });
+
     test('연속 final과 합쳐진 짧은 final을 처리한다', () {
       final progress = createProgress();
 
@@ -61,6 +74,20 @@ void main() {
       expect(progress.pendingFinalText, isEmpty);
       progress.acceptTranscript('오늘 아침에는', TranscriptKind.finalResult);
       expect(progress.cursor, 2);
+    });
+
+    test('불일치 final을 폐기해도 partial 커서를 확정하지 않는다', () {
+      final progress = createProgress(pendingFinalUnitLimit: 10);
+      progress.acceptTranscript('오늘 아침에는 창문을 열고', TranscriptKind.partial);
+
+      progress.acceptTranscript(
+        '전혀 다른 이야기를 길게 합니다',
+        TranscriptKind.finalResult,
+      );
+
+      expect(progress.cursor, 4);
+      expect(progress.anchor, 0);
+      expect(progress.pendingFinalText, isEmpty);
     });
 
     test('불일치 final 누적 뒤 새 final 단독 매칭으로 복귀한다', () {

@@ -52,11 +52,10 @@ final class ReadingProgress {
       }
       if (match != null) {
         _cursor = _furthest(_cursor, match.cursor);
-        _anchor = _cursor;
+        _anchor = match.cursor;
         _pendingFinalText = '';
       } else if (TextNormalizer.units(_pendingFinalText).length >
           pendingFinalUnitLimit) {
-        _anchor = _cursor;
         _pendingFinalText = '';
       }
     } else {
