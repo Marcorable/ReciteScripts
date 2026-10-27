@@ -30,7 +30,7 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
       queue: .main
     ) { [weak self] _ in
       Task { @MainActor in
-        await self?.cancelActiveSession(emitCancelled: true)
+        await self?.handleBackgroundTransition()
       }
     })
     observers.append(NotificationCenter.default.addObserver(
@@ -207,6 +207,11 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
     guard let session = activeSession else { return }
     await session.fail(code: .interrupted, retryable: true)
     if activeSession === session { activeSession = nil }
+  }
+
+  private func handleBackgroundTransition() async {
+    pendingStart = nil
+    await cancelActiveSession(emitCancelled: true)
   }
 
   private func ensurePending(_ reservation: StartReservation) throws {
