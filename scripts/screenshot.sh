@@ -24,12 +24,18 @@ capture_android() {
         echo "adb를 찾을 수 없다: $adb" >&2
         return 1
     fi
-    "$adb" wait-for-device
     if [ -z "$device" ]; then
         device="$($adb devices | awk '$2 == "device" && $1 ~ /^emulator-/ {print $1; exit}')"
     fi
     if [ -z "$device" ]; then
         echo "실행 중인 Android Emulator가 없다" >&2
+        return 1
+    fi
+    if ! $adb devices | awk -v target="$device" '
+        $1 == target && $2 == "device" { found = 1 }
+        END { exit found ? 0 : 1 }
+    '; then
+        echo "사용 가능한 Android 기기를 찾을 수 없다: $device" >&2
         return 1
     fi
     if [ ! -f "$apk" ]; then
