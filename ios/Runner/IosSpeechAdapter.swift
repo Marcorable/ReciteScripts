@@ -179,8 +179,8 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
     do {
       try await session.start()
     } catch {
-      if activeSession === session { activeSession = nil }
       await session.cancel(emitEvent: false)
+      if activeSession === session { activeSession = nil }
       throw Self.pigeonError(from: error)
     }
   }
