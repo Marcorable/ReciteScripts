@@ -21,7 +21,7 @@ final class IosSpeechSession {
   private var sequence: Int64 = 0
   private var acceptsEvents = true
   private var tapInstalled = false
-  private var cleanupStarted = false
+  private var cleanupTask: Task<Void, Never>?
   private let conversionFailed = ThreadSafeFlag()
 
   init(
@@ -80,16 +80,18 @@ final class IosSpeechSession {
   }
 
   func cancel(emitEvent: Bool) async {
-    guard acceptsEvents else { return }
-    if emitEvent { await emit(kind: .cancelled) }
-    acceptsEvents = false
+    if acceptsEvents {
+      if emitEvent { await emit(kind: .cancelled) }
+      acceptsEvents = false
+    }
     await cleanUp(finalize: false)
   }
 
   func fail(code: NativeSttFailureCode, retryable: Bool) async {
-    guard acceptsEvents else { return }
-    await emit(kind: .failure, failureCode: code, retryable: retryable)
-    acceptsEvents = false
+    if acceptsEvents {
+      await emit(kind: .failure, failureCode: code, retryable: retryable)
+      acceptsEvents = false
+    }
     await cleanUp(finalize: false)
     finishedHandler(self)
   }
@@ -181,8 +183,19 @@ final class IosSpeechSession {
   }
 
   private func cleanUp(finalize: Bool) async {
-    guard !cleanupStarted else { return }
-    cleanupStarted = true
+    if let cleanupTask {
+      await cleanupTask.value
+      return
+    }
+    let task = Task { @MainActor [weak self] in
+      guard let self else { return }
+      await self.performCleanUp(finalize: finalize)
+    }
+    cleanupTask = task
+    await task.value
+  }
+
+  private func performCleanUp(finalize: Bool) async {
     engine.stop()
     if tapInstalled {
       engine.inputNode.removeTap(onBus: 0)
