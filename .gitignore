@@ -50,6 +50,12 @@ Tuist/.build/
 .bundle/
 vendor/bundle/
 Pods/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+*.iml
 
 # ── 에이전트 로컬 설정 (개인 설정은 커밋하지 않음) ─────────────────
 .claude/settings.local.json

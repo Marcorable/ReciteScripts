@@ -4,4 +4,5 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 (cd "$FLUTTER_PROJECT" && dart format --output=none --set-exit-if-changed .)
 run_flutter analyze
+(cd "$FLUTTER_PROJECT" && dart test test/unit)
 run_flutter test
