@@ -60,11 +60,15 @@ final class ReadingProgress {
         _pendingFinalText = '';
       }
     } else {
-      final match = matcher.match(
-        hypothesis: _pendingFinalText + text,
-        anchor: _anchor,
-      );
-      if (match != null) _cursor = _furthest(_cursor, match.cursor);
+      final hypothesis = _pendingFinalText + text;
+      final match = matcher.match(hypothesis: hypothesis, anchor: _anchor);
+      final stopsBeforeLastTokenEnds =
+          match != null &&
+          match.cursor == matcher.tokens.length &&
+          TextNormalizer.units(hypothesis).length < match.matchedUnitCount;
+      if (match != null && !stopsBeforeLastTokenEnds) {
+        _cursor = _furthest(_cursor, match.cursor);
+      }
     }
     return _update(previous);
   }

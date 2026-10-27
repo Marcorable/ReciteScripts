@@ -150,6 +150,23 @@ void main() {
       expect(progress.isComplete, isTrue);
     });
 
+    test('마지막 어절의 미완성 partial은 완료하지 않는다', () {
+      final progress = ReadingProgress(
+        matcher: CursorMatcher.fromScript('마셨다'),
+      );
+
+      final partial = progress.acceptTranscript('마셨', TranscriptKind.partial);
+      final completed = progress.acceptTranscript(
+        '마셨다',
+        TranscriptKind.finalResult,
+      );
+
+      expect(partial.cursor, 0);
+      expect(partial.repetitionCompleted, isFalse);
+      expect(completed.cursor, 1);
+      expect(completed.repetitionCompleted, isTrue);
+    });
+
     test('반복 경계에서 전사 상태와 커서를 초기화한다', () {
       final progress = createProgress();
       progress.acceptTranscript(script, TranscriptKind.finalResult);

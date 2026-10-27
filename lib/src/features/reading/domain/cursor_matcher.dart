@@ -29,11 +29,13 @@ final class CursorMatch {
     required this.cursor,
     required this.normalizedDistance,
     required this.skippedTokens,
+    required this.matchedUnitCount,
   });
 
   final int cursor;
   final double normalizedDistance;
   final int skippedTokens;
+  final int matchedUnitCount;
 }
 
 /// 현재 확정 앵커 이후의 제한된 구간만 자모 편집거리로 비교한다.
@@ -63,6 +65,7 @@ final class CursorMatcher {
               cursor: anchor + 1,
               normalizedDistance: 0,
               skippedTokens: 0,
+              matchedUnitCount: currentUnits.length,
             )
           : null;
     }
@@ -115,6 +118,7 @@ final class CursorMatcher {
           cursor: boundary.cursor,
           normalizedDistance: normalized,
           skippedTokens: skipped,
+          matchedUnitCount: boundary.unitEnd,
         );
       }
     }
