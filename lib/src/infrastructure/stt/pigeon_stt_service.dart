@@ -15,6 +15,7 @@ final class PigeonSttService implements SttService, pigeon.NativeSttFlutterApi {
   final pigeon.NativeSttHostApi _host;
   final Map<String, StreamController<SttEvent>> _controllers = {};
   final Map<String, int> _activeGenerations = {};
+  final Map<String, int> _lastGenerations = {};
   final Map<String, int> _lastSequences = {};
   bool _disposed = false;
 
@@ -27,7 +28,16 @@ final class PigeonSttService implements SttService, pigeon.NativeSttFlutterApi {
   @override
   Future<SttPreparation> prepare({required String locale}) async {
     _ensureActive();
-    final native = await _host.prepare(locale);
+    return _preparationFromNative(await _host.prepare(locale));
+  }
+
+  @override
+  Future<SttPreparation> requestModelDownload({required String locale}) async {
+    _ensureActive();
+    return _preparationFromNative(await _host.requestModelDownload(locale));
+  }
+
+  SttPreparation _preparationFromNative(pigeon.NativeSttPreparation native) {
     return SttPreparation(
       status: SttPreparationStatus.values[native.status.index],
       failureCode: native.failureCode == null
@@ -50,15 +60,16 @@ final class PigeonSttService implements SttService, pigeon.NativeSttFlutterApi {
     if (request.sessionId.isEmpty || request.locale.isEmpty) {
       throw ArgumentError('sessionId와 locale은 비어 있을 수 없습니다.');
     }
-    final previous = _activeGenerations[request.sessionId];
-    if (previous != null) {
-      if (request.generation <= previous) {
-        throw StateError('generation은 이전 값보다 커야 합니다.');
-      }
+    final previous = _lastGenerations[request.sessionId];
+    if (previous != null && request.generation <= previous) {
+      throw StateError('generation은 이전 값보다 커야 합니다.');
+    }
+    if (_activeGenerations.containsKey(request.sessionId)) {
       throw const SttStartException(SttFailureCode.busy);
     }
 
     _activeGenerations[request.sessionId] = request.generation;
+    _lastGenerations[request.sessionId] = request.generation;
     _lastSequences[request.sessionId] = -1;
     try {
       await _host.start(
@@ -124,6 +135,12 @@ final class PigeonSttService implements SttService, pigeon.NativeSttFlutterApi {
         retryable: event.retryable,
       ),
     );
+    if (event.kind == pigeon.NativeSttEventKind.ended ||
+        event.kind == pigeon.NativeSttEventKind.failure ||
+        event.kind == pigeon.NativeSttEventKind.cancelled) {
+      _activeGenerations.remove(event.sessionId);
+      _lastSequences.remove(event.sessionId);
+    }
   }
 
   @override
@@ -131,6 +148,7 @@ final class PigeonSttService implements SttService, pigeon.NativeSttFlutterApi {
     if (_disposed) return;
     _disposed = true;
     _activeGenerations.clear();
+    _lastGenerations.clear();
     _lastSequences.clear();
     pigeon.NativeSttFlutterApi.setUp(null);
     await _host.dispose();

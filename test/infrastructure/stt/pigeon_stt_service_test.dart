@@ -39,6 +39,7 @@ void main() {
     for (final method in <String>[
       'checkAvailability',
       'prepare',
+      'requestModelDownload',
       'start',
       'cancel',
       'dispose',
@@ -79,6 +80,24 @@ void main() {
     expect(availability.modelStatus, SttModelStatus.supported);
     expect(preparation.status, SttPreparationStatus.modelDownloadRequired);
     expect(preparation.failureCode, SttFailureCode.modelMissing);
+    await service.dispose();
+  });
+
+  test('명시적인 모델 다운로드 요청 결과를 구조화해 전달한다', () async {
+    setHostHandler(
+      'requestModelDownload',
+      (_) => ok(
+        pigeon.NativeSttPreparation(
+          status: pigeon.NativeSttPreparationStatus.modelDownloading,
+        ),
+      ),
+    );
+    final service = PigeonSttService();
+
+    final preparation = await service.requestModelDownload(locale: 'ko-KR');
+
+    expect(preparation.status, SttPreparationStatus.modelDownloading);
+    expect(preparation.failureCode, isNull);
     await service.dispose();
   });
 
@@ -235,6 +254,69 @@ void main() {
     await pumpEventQueue();
 
     expect(events, isEmpty);
+    await subscription.cancel();
+    await service.dispose();
+  });
+
+  test('terminal 이벤트 뒤 더 큰 generation으로 재시작한다', () async {
+    setHostHandler('start', (_) => ok(null));
+    final service = PigeonSttService();
+    final events = <SttEvent>[];
+    final subscription = service.events('session').listen(events.add);
+    await service.start(
+      const SttStartRequest(
+        sessionId: 'session',
+        generation: 1,
+        locale: 'ko-KR',
+      ),
+    );
+    await messenger.handlePlatformMessage(
+      'dev.flutter.pigeon.maltto.NativeSttFlutterApi.onEvent',
+      codec.encodeMessage(<Object?>[
+        pigeon.NativeSttEvent(
+          sessionId: 'session',
+          generation: 1,
+          sequence: 1,
+          kind: pigeon.NativeSttEventKind.ended,
+        ),
+      ]),
+      (_) {},
+    );
+    await service.start(
+      const SttStartRequest(
+        sessionId: 'session',
+        generation: 2,
+        locale: 'ko-KR',
+      ),
+    );
+    for (final event in <pigeon.NativeSttEvent>[
+      pigeon.NativeSttEvent(
+        sessionId: 'session',
+        generation: 1,
+        sequence: 2,
+        kind: pigeon.NativeSttEventKind.partial,
+        text: '이전 세대의 늦은 결과',
+      ),
+      pigeon.NativeSttEvent(
+        sessionId: 'session',
+        generation: 2,
+        sequence: 1,
+        kind: pigeon.NativeSttEventKind.ready,
+      ),
+    ]) {
+      await messenger.handlePlatformMessage(
+        'dev.flutter.pigeon.maltto.NativeSttFlutterApi.onEvent',
+        codec.encodeMessage(<Object?>[event]),
+        (_) {},
+      );
+    }
+    await pumpEventQueue();
+
+    expect(events.map((event) => event.kind), <SttEventKind>[
+      SttEventKind.ended,
+      SttEventKind.ready,
+    ]);
+    expect(events.last.generation, 2);
     await subscription.cancel();
     await service.dispose();
   });

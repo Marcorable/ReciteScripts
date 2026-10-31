@@ -535,6 +535,27 @@ class NativeSttHostApi {
     return pigeonVar_replyValue! as NativeSttPreparation;
   }
 
+  Future<NativeSttPreparation> requestModelDownload(String locale) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.maltto.NativeSttHostApi.requestModelDownload$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[locale],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
+    return pigeonVar_replyValue! as NativeSttPreparation;
+  }
+
   Future<void> start(NativeSttStartRequest request) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.maltto.NativeSttHostApi.start$pigeonVar_messageChannelSuffix';

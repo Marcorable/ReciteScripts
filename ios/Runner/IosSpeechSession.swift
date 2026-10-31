@@ -39,7 +39,7 @@ final class IosSpeechSession {
   }
 
   func matches(event: NativeSttEvent) -> Bool {
-    acceptsEvents && event.sessionId == sessionId && event.generation == generation
+    event.sessionId == sessionId && event.generation == generation
   }
 
   func start() async throws {

@@ -541,6 +541,7 @@ class SttApiPigeonCodec: FlutterStandardMessageCodec, @unchecked Sendable {
 protocol NativeSttHostApi {
   func checkAvailability(locale: String) async throws -> NativeSttAvailability
   func prepare(locale: String) async throws -> NativeSttPreparation
+  func requestModelDownload(locale: String) async throws -> NativeSttPreparation
   func start(request: NativeSttStartRequest) async throws
   func cancel(sessionId: String) async throws
   func dispose() async throws
@@ -585,6 +586,23 @@ class NativeSttHostApiSetup {
       }
     } else {
       prepareChannel.setMessageHandler(nil)
+    }
+    let requestModelDownloadChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.maltto.NativeSttHostApi.requestModelDownload\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      requestModelDownloadChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let localeArg = args[0] as! String
+        Task { @MainActor in
+          do {
+            let result = try await api.requestModelDownload(locale: localeArg)
+            reply(wrapResult(result))
+          } catch {
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      requestModelDownloadChannel.setMessageHandler(nil)
     }
     let startChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.maltto.NativeSttHostApi.start\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {

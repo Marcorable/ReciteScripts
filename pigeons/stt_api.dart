@@ -4,6 +4,8 @@ import 'package:pigeon/pigeon.dart';
   PigeonOptions(
     dartOut: 'lib/src/infrastructure/stt/generated/stt_api.g.dart',
     dartOptions: DartOptions(),
+    kotlinOut: 'android/app/src/main/kotlin/com/marcorable/maltto/Generated/SttApi.g.kt',
+    kotlinOptions: KotlinOptions(package: 'com.marcorable.maltto'),
     swiftOut: 'ios/Runner/Generated/SttApi.g.swift',
     swiftOptions: SwiftOptions(),
   ),
@@ -112,6 +114,9 @@ abstract class NativeSttHostApi {
 
   @async
   NativeSttPreparation prepare(String locale);
+
+  @async
+  NativeSttPreparation requestModelDownload(String locale);
 
   @async
   void start(NativeSttStartRequest request);
