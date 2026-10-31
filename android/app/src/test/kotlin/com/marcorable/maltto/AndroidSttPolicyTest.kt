@@ -64,6 +64,35 @@ class AndroidSttPolicyTest {
     }
 
     @Test
+    fun `model download progress retains recognizer until a terminal update`() {
+        val progress =
+            AndroidSttPolicy.modelDownloadUpdateFor(ModelDownloadCallbackKind.PROGRESS)
+        val success =
+            AndroidSttPolicy.modelDownloadUpdateFor(ModelDownloadCallbackKind.SUCCESS)
+        val scheduled =
+            AndroidSttPolicy.modelDownloadUpdateFor(ModelDownloadCallbackKind.SCHEDULED)
+        val error =
+            AndroidSttPolicy.modelDownloadUpdateFor(ModelDownloadCallbackKind.ERROR)
+
+        assertEquals(NativeSttModelStatus.DOWNLOADING, progress.status)
+        assertFalse(progress.isTerminal)
+        assertEquals(NativeSttModelStatus.INSTALLED, success.status)
+        assertTrue(success.isTerminal)
+        assertTrue(scheduled.isTerminal)
+        assertTrue(error.isTerminal)
+        assertFalse(
+            AndroidSttPolicy.modelStatusCompletesDownloadRequest(
+                NativeSttModelStatus.DOWNLOADING,
+            ),
+        )
+        assertTrue(
+            AndroidSttPolicy.modelStatusCompletesDownloadRequest(
+                NativeSttModelStatus.INSTALLED,
+            ),
+        )
+    }
+
+    @Test
     fun `recognizer errors map to platform neutral failures`() {
         assertEquals(
             NativeSttFailureCode.PERMISSION_DENIED,

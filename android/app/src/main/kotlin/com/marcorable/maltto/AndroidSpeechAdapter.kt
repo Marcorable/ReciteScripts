@@ -246,11 +246,7 @@ internal class AndroidSpeechAdapter(
         AndroidSttPolicy.modelStatus(locale, queryRecognitionSupport(locale)).also { status ->
             val localeKey = localeKey(locale)
             modelStatusCache[localeKey] = status
-            if (
-                status == NativeSttModelStatus.INSTALLED ||
-                status == NativeSttModelStatus.DOWNLOADING ||
-                status == NativeSttModelStatus.UNSUPPORTED
-            ) {
+            if (AndroidSttPolicy.modelStatusCompletesDownloadRequest(status)) {
                 releaseModelDownloadRecognizer(localeKey)
             }
         }
@@ -266,31 +262,35 @@ internal class AndroidSpeechAdapter(
                 activity.mainExecutor,
                 object : ModelDownloadListener {
                     override fun onProgress(completedPercent: Int) {
-                        completeModelDownloadRequest(
+                        applyModelDownloadUpdate(
                             localeKey,
                             recognizer,
-                            NativeSttModelStatus.DOWNLOADING,
+                            ModelDownloadCallbackKind.PROGRESS,
                         )
                     }
 
                     override fun onSuccess() {
-                        completeModelDownloadRequest(
+                        applyModelDownloadUpdate(
                             localeKey,
                             recognizer,
-                            NativeSttModelStatus.INSTALLED,
+                            ModelDownloadCallbackKind.SUCCESS,
                         )
                     }
 
                     override fun onScheduled() {
-                        completeModelDownloadRequest(
+                        applyModelDownloadUpdate(
                             localeKey,
                             recognizer,
-                            NativeSttModelStatus.DOWNLOADING,
+                            ModelDownloadCallbackKind.SCHEDULED,
                         )
                     }
 
                     override fun onError(error: Int) {
-                        completeModelDownloadRequest(localeKey, recognizer, null)
+                        applyModelDownloadUpdate(
+                            localeKey,
+                            recognizer,
+                            ModelDownloadCallbackKind.ERROR,
+                        )
                     }
                 },
             )
@@ -306,20 +306,23 @@ internal class AndroidSpeechAdapter(
         }
     }
 
-    private fun completeModelDownloadRequest(
+    private fun applyModelDownloadUpdate(
         localeKey: String,
         recognizer: SpeechRecognizer,
-        status: NativeSttModelStatus?,
+        kind: ModelDownloadCallbackKind,
     ) {
         requireMainThread()
+        val update = AndroidSttPolicy.modelDownloadUpdateFor(kind)
         if (!disposed) {
-            if (status == null) {
+            if (update.status == null) {
                 modelStatusCache.remove(localeKey)
             } else {
-                modelStatusCache[localeKey] = status
+                modelStatusCache[localeKey] = update.status
             }
         }
-        releaseModelDownloadRecognizer(localeKey, recognizer)
+        if (update.isTerminal) {
+            releaseModelDownloadRecognizer(localeKey, recognizer)
+        }
     }
 
     private suspend fun queryRecognitionSupport(locale: String): RecognitionSupportSnapshot =

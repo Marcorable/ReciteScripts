@@ -9,6 +9,18 @@ internal data class RecognitionSupportSnapshot(
     val supportedLanguages: List<String>,
 )
 
+internal enum class ModelDownloadCallbackKind {
+    PROGRESS,
+    SUCCESS,
+    SCHEDULED,
+    ERROR,
+}
+
+internal data class ModelDownloadUpdate(
+    val status: NativeSttModelStatus?,
+    val isTerminal: Boolean,
+)
+
 internal object AndroidSttPolicy {
     fun preparationForPermission(permission: NativeSttPermission): NativeSttPreparation? =
         when (permission) {
@@ -68,6 +80,33 @@ internal object AndroidSttPolicy {
                 },
             failureCode = failure,
         )
+
+    fun modelDownloadUpdateFor(kind: ModelDownloadCallbackKind): ModelDownloadUpdate =
+        when (kind) {
+            ModelDownloadCallbackKind.PROGRESS -> ModelDownloadUpdate(
+                status = NativeSttModelStatus.DOWNLOADING,
+                isTerminal = false,
+            )
+
+            ModelDownloadCallbackKind.SUCCESS -> ModelDownloadUpdate(
+                status = NativeSttModelStatus.INSTALLED,
+                isTerminal = true,
+            )
+
+            ModelDownloadCallbackKind.SCHEDULED -> ModelDownloadUpdate(
+                status = NativeSttModelStatus.DOWNLOADING,
+                isTerminal = true,
+            )
+
+            ModelDownloadCallbackKind.ERROR -> ModelDownloadUpdate(
+                status = null,
+                isTerminal = true,
+            )
+        }
+
+    fun modelStatusCompletesDownloadRequest(status: NativeSttModelStatus): Boolean =
+        status == NativeSttModelStatus.INSTALLED ||
+            status == NativeSttModelStatus.UNSUPPORTED
 
     fun failureForRecognizerError(error: Int): NativeSttFailureCode =
         when (error) {
