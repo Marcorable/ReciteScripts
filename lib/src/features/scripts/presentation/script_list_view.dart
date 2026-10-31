@@ -1,10 +1,20 @@
 import 'package:flutter/cupertino.dart';
+import 'package:maltto/src/features/scripts/model/script.dart';
+import 'package:maltto/src/features/scripts/presentation/script_create_view.dart';
+import 'package:maltto/src/features/scripts/presentation/script_create_view_model.dart';
+import 'package:maltto/src/features/scripts/presentation/script_list_components.dart';
 import 'package:maltto/src/features/scripts/presentation/script_list_view_model.dart';
+import 'package:maltto/src/shared/design/app_tokens.dart';
 
 final class ScriptListView extends StatefulWidget {
-  const ScriptListView({required this.viewModel, super.key});
+  const ScriptListView({
+    required this.viewModel,
+    required this.createScriptViewModel,
+    super.key,
+  });
 
   final ScriptListViewModel viewModel;
+  final ScriptCreateViewModel Function() createScriptViewModel;
 
   @override
   State<ScriptListView> createState() => _ScriptListViewState();
@@ -17,44 +27,113 @@ final class _ScriptListViewState extends State<ScriptListView> {
     widget.viewModel.load();
   }
 
+  Future<void> _openCreateView() async {
+    await Navigator.of(context).push<void>(
+      CupertinoPageRoute<void>(
+        builder: (_) =>
+            ScriptCreateView(viewModel: widget.createScriptViewModel()),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(Script script) async {
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('대본을 삭제할까요?'),
+        content: Text('“${script.title}” 대본을 기기에서 삭제합니다.'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('취소'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final deleted = await widget.viewModel.deleteScript(script.id);
+    if (!deleted && mounted) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('삭제하지 못했습니다'),
+          content: const Text('대본은 그대로 유지됩니다. 다시 시도해 주세요.'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('대본')),
-      child: SafeArea(
-        child: AnimatedBuilder(
-          animation: widget.viewModel,
-          builder: (context, child) {
-            if (widget.viewModel.scripts.isEmpty) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Semantics(
-                    label: '저장된 대본 없음',
-                    child: const Text(
-                      '저장된 대본이 없습니다.',
-                      textAlign: TextAlign.center,
+      backgroundColor: CupertinoColors.systemGroupedBackground,
+      child: AnimatedBuilder(
+        animation: widget.viewModel,
+        builder: (context, child) {
+          return CustomScrollView(
+            slivers: [
+              CupertinoSliverNavigationBar(
+                largeTitle: const Text('대본'),
+                trailing: ConstrainedBox(
+                  constraints: AppTargets.preferredConstraints,
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: _openCreateView,
+                    child: Semantics(
+                      button: true,
+                      label: '새 대본 추가',
+                      excludeSemantics: true,
+                      child: const Text('추가'),
                     ),
                   ),
                 ),
-              );
-            }
-
-            return ListView.builder(
-              itemCount: widget.viewModel.scripts.length,
-              itemBuilder: (context, index) {
-                final script = widget.viewModel.scripts[index];
-                return Semantics(
-                  label: '${script.title}, 낭독 설정 열기',
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(script.title),
+              ),
+              if (widget.viewModel.isLoading)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CupertinoActivityIndicator()),
+                )
+              else if (widget.viewModel.hasLoadError)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: ScriptLoadError(onRetry: widget.viewModel.retry),
+                )
+              else if (widget.viewModel.scripts.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: ScriptEmptyState(onAdd: _openCreateView),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: AppSpacing.large,
                   ),
-                );
-              },
-            );
-          },
-        ),
+                  sliver: SliverList.builder(
+                    itemCount: widget.viewModel.scripts.length,
+                    itemBuilder: (context, index) {
+                      final script = widget.viewModel.scripts[index];
+                      return ScriptListTile(
+                        script: script,
+                        onDelete: () => _confirmDelete(script),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
