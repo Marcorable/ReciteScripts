@@ -6,7 +6,7 @@ import Synchronization
 @MainActor
 final class IosSpeechSession {
   typealias EventHandler = @MainActor (NativeSttEvent) async -> Void
-  typealias FinishedHandler = @MainActor (IosSpeechSession) -> Void
+  typealias FinishedHandler = @MainActor (IosSpeechSession, NativeSttEvent) async -> Void
 
   let sessionId: String
   let generation: Int64
@@ -39,7 +39,7 @@ final class IosSpeechSession {
   }
 
   func matches(event: NativeSttEvent) -> Bool {
-    acceptsEvents && event.sessionId == sessionId && event.generation == generation
+    event.sessionId == sessionId && event.generation == generation
   }
 
   func start() async throws {
@@ -80,20 +80,17 @@ final class IosSpeechSession {
   }
 
   func cancel(emitEvent: Bool) async {
-    if acceptsEvents {
-      acceptsEvents = false
-      if emitEvent { await emitUnchecked(kind: .cancelled) }
-    }
+    let shouldEmit = acceptsEvents && emitEvent
+    acceptsEvents = false
     await cleanUp(finalize: false)
+    if shouldEmit { await finish(kind: .cancelled) }
   }
 
   func fail(code: NativeSttFailureCode, retryable: Bool) async {
-    if acceptsEvents {
-      acceptsEvents = false
-      await emitUnchecked(kind: .failure, failureCode: code, retryable: retryable)
-    }
+    guard acceptsEvents else { return }
+    acceptsEvents = false
     await cleanUp(finalize: false)
-    finishedHandler(self)
+    await finish(kind: .failure, failureCode: code, retryable: retryable)
   }
 
   private func consumeResults() -> Task<Void, Never> {
@@ -107,25 +104,25 @@ final class IosSpeechSession {
         }
         guard let self, self.acceptsEvents else { return }
         self.acceptsEvents = false
+        self.resultsTask = nil
+        await self.cleanUp(finalize: false)
         if self.conversionFailed.value {
-          await self.emitUnchecked(
+          await self.finish(
             kind: .failure,
             failureCode: .audioFormatMismatch,
             retryable: false
           )
         } else {
-          await self.emitUnchecked(kind: .ended)
+          await self.finish(kind: .ended)
         }
-        await self.cleanUp(finalize: false)
-        self.finishedHandler(self)
       } catch is CancellationError {
         return
       } catch {
         guard let self, self.acceptsEvents else { return }
         self.acceptsEvents = false
-        await self.emitUnchecked(kind: .failure, failureCode: .unknown, retryable: true)
+        self.resultsTask = nil
         await self.cleanUp(finalize: false)
-        self.finishedHandler(self)
+        await self.finish(kind: .failure, failureCode: .unknown, retryable: true)
       }
     }
   }
@@ -182,17 +179,37 @@ final class IosSpeechSession {
     failureCode: NativeSttFailureCode? = nil,
     retryable: Bool? = nil
   ) async {
-    sequence += 1
     await eventHandler(
-      NativeSttEvent(
-        sessionId: sessionId,
-        generation: generation,
-        sequence: sequence,
-        kind: kind,
-        text: text,
-        failureCode: failureCode,
-        retryable: retryable
-      )
+      makeEvent(kind: kind, text: text, failureCode: failureCode, retryable: retryable)
+    )
+  }
+
+  private func finish(
+    kind: NativeSttEventKind,
+    failureCode: NativeSttFailureCode? = nil,
+    retryable: Bool? = nil
+  ) async {
+    await finishedHandler(
+      self,
+      makeEvent(kind: kind, failureCode: failureCode, retryable: retryable)
+    )
+  }
+
+  private func makeEvent(
+    kind: NativeSttEventKind,
+    text: String? = nil,
+    failureCode: NativeSttFailureCode? = nil,
+    retryable: Bool? = nil
+  ) -> NativeSttEvent {
+    sequence += 1
+    return NativeSttEvent(
+      sessionId: sessionId,
+      generation: generation,
+      sequence: sequence,
+      kind: kind,
+      text: text,
+      failureCode: failureCode,
+      retryable: retryable
     )
   }
 

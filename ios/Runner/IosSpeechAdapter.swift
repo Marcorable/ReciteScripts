@@ -116,6 +116,30 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
     case .downloading:
       return NativeSttPreparation(status: .modelDownloading, failureCode: nil)
     case .supported:
+      return NativeSttPreparation(status: .modelDownloadRequired, failureCode: .modelMissing)
+    @unknown default:
+      return NativeSttPreparation(status: .unsupported, failureCode: .unknown)
+    }
+  }
+
+  func requestModelDownload(locale: String) async throws -> NativeSttPreparation {
+    guard SpeechTranscriber.isAvailable else {
+      return NativeSttPreparation(status: .unsupported, failureCode: .onDeviceUnavailable)
+    }
+    let requestedLocale = Locale(identifier: locale)
+    guard let supportedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale)
+    else {
+      return NativeSttPreparation(status: .unsupported, failureCode: .localeUnsupported)
+    }
+    let transcriber = Self.makeTranscriber(locale: supportedLocale)
+    switch await AssetInventory.status(forModules: [transcriber]) {
+    case .installed:
+      return NativeSttPreparation(status: .ready, failureCode: nil)
+    case .downloading:
+      return NativeSttPreparation(status: .modelDownloading, failureCode: nil)
+    case .unsupported:
+      return NativeSttPreparation(status: .unsupported, failureCode: .localeUnsupported)
+    case .supported:
       guard let request = try await AssetInventory.assetInstallationRequest(
         supporting: [transcriber]
       ) else {
@@ -170,9 +194,10 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
     ) { [weak self] event in
       guard let self, self.activeSession?.matches(event: event) == true else { return }
       try? await self.flutterApi.onEvent(event: event)
-    } onFinished: { [weak self] session in
+    } onFinished: { [weak self] session, event in
       guard let self, self.activeSession === session else { return }
       self.activeSession = nil
+      try? await self.flutterApi.onEvent(event: event)
     }
     activeSession = session
     pendingStart = nil
