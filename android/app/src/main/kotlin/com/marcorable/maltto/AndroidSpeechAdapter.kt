@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Looper
+import android.speech.ModelDownloadListener
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
@@ -17,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
@@ -39,6 +41,7 @@ internal class AndroidSpeechAdapter(
     private var pendingStart: StartReservation? = null
     private val modelStatusCache = mutableMapOf<String, NativeSttModelStatus>()
     private val supportRecognizers = mutableSetOf<SpeechRecognizer>()
+    private val modelDownloadRecognizers = mutableMapOf<String, SpeechRecognizer>()
     private var disposed = false
 
     override suspend fun checkAvailability(locale: String): NativeSttAvailability {
@@ -86,15 +89,8 @@ internal class AndroidSpeechAdapter(
             AndroidSttPolicy.preparationFor(status)
         } catch (error: FlutterError) {
             modelStatusCache.remove(localeKey(locale))
-            val failure = nativeFailureFromPigeonCode(error.code)
-            NativeSttPreparation(
-                status =
-                    if (failure == NativeSttFailureCode.MODEL_MISSING) {
-                        NativeSttPreparationStatus.MODEL_DOWNLOAD_REQUIRED
-                    } else {
-                        NativeSttPreparationStatus.UNSUPPORTED
-                    },
-                failureCode = failure,
+            AndroidSttPolicy.preparationForFailure(
+                nativeFailureFromPigeonCode(error.code),
             )
         }
     }
@@ -110,7 +106,19 @@ internal class AndroidSpeechAdapter(
                 NativeSttFailureCode.ON_DEVICE_UNAVAILABLE,
             )
         }
-        return when (val status = queryModelStatus(locale)) {
+        val localeKey = localeKey(locale)
+        if (modelDownloadRecognizers.containsKey(localeKey)) {
+            return NativeSttPreparation(NativeSttPreparationStatus.MODEL_DOWNLOADING)
+        }
+        val status = try {
+            queryModelStatus(locale)
+        } catch (error: FlutterError) {
+            modelStatusCache.remove(localeKey)
+            return AndroidSttPolicy.preparationForFailure(
+                nativeFailureFromPigeonCode(error.code),
+            )
+        }
+        return when (status) {
             NativeSttModelStatus.INSTALLED,
             NativeSttModelStatus.DOWNLOADING,
             NativeSttModelStatus.UNSUPPORTED,
@@ -120,10 +128,12 @@ internal class AndroidSpeechAdapter(
             NativeSttModelStatus.MISSING,
             -> {
                 val recognizer = createOnDeviceRecognizer()
+                modelDownloadRecognizers[localeKey] = recognizer
                 try {
-                    recognizer.triggerModelDownload(recognitionIntent(locale))
-                } finally {
-                    recognizer.destroy()
+                    triggerModelDownload(localeKey, recognizer, recognitionIntent(locale))
+                } catch (error: Throwable) {
+                    releaseModelDownloadRecognizer(localeKey, recognizer)
+                    throw error
                 }
                 NativeSttPreparation(NativeSttPreparationStatus.MODEL_DOWNLOADING)
             }
@@ -201,6 +211,7 @@ internal class AndroidSpeechAdapter(
         activeSession = null
         permissionManager.cancelPendingRequest()
         destroySupportRecognizers()
+        destroyModelDownloadRecognizers()
         modelStatusCache.clear()
         eventScope.cancel()
     }
@@ -226,14 +237,90 @@ internal class AndroidSpeechAdapter(
         activeSession = null
         permissionManager.cancelPendingRequest()
         destroySupportRecognizers()
+        destroyModelDownloadRecognizers()
         modelStatusCache.clear()
         eventScope.cancel()
     }
 
     private suspend fun queryModelStatus(locale: String): NativeSttModelStatus =
         AndroidSttPolicy.modelStatus(locale, queryRecognitionSupport(locale)).also { status ->
-            modelStatusCache[localeKey(locale)] = status
+            val localeKey = localeKey(locale)
+            modelStatusCache[localeKey] = status
+            if (
+                status == NativeSttModelStatus.INSTALLED ||
+                status == NativeSttModelStatus.DOWNLOADING ||
+                status == NativeSttModelStatus.UNSUPPORTED
+            ) {
+                releaseModelDownloadRecognizer(localeKey)
+            }
         }
+
+    private fun triggerModelDownload(
+        localeKey: String,
+        recognizer: SpeechRecognizer,
+        intent: Intent,
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            recognizer.triggerModelDownload(
+                intent,
+                activity.mainExecutor,
+                object : ModelDownloadListener {
+                    override fun onProgress(completedPercent: Int) {
+                        completeModelDownloadRequest(
+                            localeKey,
+                            recognizer,
+                            NativeSttModelStatus.DOWNLOADING,
+                        )
+                    }
+
+                    override fun onSuccess() {
+                        completeModelDownloadRequest(
+                            localeKey,
+                            recognizer,
+                            NativeSttModelStatus.INSTALLED,
+                        )
+                    }
+
+                    override fun onScheduled() {
+                        completeModelDownloadRequest(
+                            localeKey,
+                            recognizer,
+                            NativeSttModelStatus.DOWNLOADING,
+                        )
+                    }
+
+                    override fun onError(error: Int) {
+                        completeModelDownloadRequest(localeKey, recognizer, null)
+                    }
+                },
+            )
+            return
+        }
+
+        recognizer.triggerModelDownload(intent)
+        // API 33 has no delivery callback. Keep the recognizer alive long enough for
+        // its asynchronous service connection to forward the request.
+        eventScope.launch {
+            delay(MODEL_DOWNLOAD_REQUEST_RETENTION_MILLIS)
+            releaseModelDownloadRecognizer(localeKey, recognizer)
+        }
+    }
+
+    private fun completeModelDownloadRequest(
+        localeKey: String,
+        recognizer: SpeechRecognizer,
+        status: NativeSttModelStatus?,
+    ) {
+        requireMainThread()
+        if (!disposed) {
+            if (status == null) {
+                modelStatusCache.remove(localeKey)
+            } else {
+                modelStatusCache[localeKey] = status
+            }
+        }
+        releaseModelDownloadRecognizer(localeKey, recognizer)
+    }
 
     private suspend fun queryRecognitionSupport(locale: String): RecognitionSupportSnapshot =
         try {
@@ -325,6 +412,24 @@ internal class AndroidSpeechAdapter(
         recognizers.forEach(SpeechRecognizer::destroy)
     }
 
+    private fun releaseModelDownloadRecognizer(
+        localeKey: String,
+        expected: SpeechRecognizer? = null,
+    ) {
+        requireMainThread()
+        val recognizer = modelDownloadRecognizers[localeKey] ?: return
+        if (expected != null && recognizer !== expected) return
+        modelDownloadRecognizers.remove(localeKey)
+        recognizer.destroy()
+    }
+
+    private fun destroyModelDownloadRecognizers() {
+        requireMainThread()
+        val recognizers = modelDownloadRecognizers.values.toList()
+        modelDownloadRecognizers.clear()
+        recognizers.forEach(SpeechRecognizer::destroy)
+    }
+
     private fun sendEvent(event: NativeSttEvent) {
         val session = activeSession
         if (disposed || session?.matches(event) != true) return
@@ -359,6 +464,7 @@ internal class AndroidSpeechAdapter(
 
     private companion object {
         const val SUPPORT_CHECK_TIMEOUT_MILLIS = 10_000L
+        const val MODEL_DOWNLOAD_REQUEST_RETENTION_MILLIS = 30_000L
     }
 }
 

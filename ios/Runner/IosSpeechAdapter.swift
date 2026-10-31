@@ -194,9 +194,10 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
     ) { [weak self] event in
       guard let self, self.activeSession?.matches(event: event) == true else { return }
       try? await self.flutterApi.onEvent(event: event)
-    } onFinished: { [weak self] session in
+    } onFinished: { [weak self] session, event in
       guard let self, self.activeSession === session else { return }
       self.activeSession = nil
+      try? await self.flutterApi.onEvent(event: event)
     }
     activeSession = session
     pendingStart = nil

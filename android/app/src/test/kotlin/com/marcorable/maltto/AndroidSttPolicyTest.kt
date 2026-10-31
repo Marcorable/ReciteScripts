@@ -51,6 +51,19 @@ class AndroidSttPolicyTest {
     }
 
     @Test
+    fun `support check failures remain structured during preparation`() {
+        val modelMissing =
+            AndroidSttPolicy.preparationForFailure(NativeSttFailureCode.MODEL_MISSING)
+        val unavailable =
+            AndroidSttPolicy.preparationForFailure(NativeSttFailureCode.ON_DEVICE_UNAVAILABLE)
+
+        assertEquals(NativeSttPreparationStatus.MODEL_DOWNLOAD_REQUIRED, modelMissing.status)
+        assertEquals(NativeSttFailureCode.MODEL_MISSING, modelMissing.failureCode)
+        assertEquals(NativeSttPreparationStatus.UNSUPPORTED, unavailable.status)
+        assertEquals(NativeSttFailureCode.ON_DEVICE_UNAVAILABLE, unavailable.failureCode)
+    }
+
+    @Test
     fun `recognizer errors map to platform neutral failures`() {
         assertEquals(
             NativeSttFailureCode.PERMISSION_DENIED,

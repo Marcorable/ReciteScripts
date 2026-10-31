@@ -58,6 +58,17 @@ internal object AndroidSttPolicy {
             )
         }
 
+    fun preparationForFailure(failure: NativeSttFailureCode): NativeSttPreparation =
+        NativeSttPreparation(
+            status =
+                if (failure == NativeSttFailureCode.MODEL_MISSING) {
+                    NativeSttPreparationStatus.MODEL_DOWNLOAD_REQUIRED
+                } else {
+                    NativeSttPreparationStatus.UNSUPPORTED
+                },
+            failureCode = failure,
+        )
+
     fun failureForRecognizerError(error: Int): NativeSttFailureCode =
         when (error) {
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
