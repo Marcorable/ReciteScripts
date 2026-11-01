@@ -2,6 +2,8 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="말또"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

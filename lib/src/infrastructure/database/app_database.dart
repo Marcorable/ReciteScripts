@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/services.dart';
 import 'package:maltto/src/infrastructure/database/migrations/schema_migration.dart';
 import 'package:maltto/src/infrastructure/database/tables/scripts.dart';
 import 'package:path/path.dart' as path;
@@ -11,12 +12,21 @@ part 'app_database.g.dart';
 
 @DriftDatabase(tables: [ScriptRows])
 final class AppDatabase extends _$AppDatabase {
+  static const _localStorageChannel = MethodChannel(
+    'com.marcorable.maltto/local_storage',
+  );
+
   AppDatabase(super.executor);
 
   factory AppDatabase.open() {
     return AppDatabase(
       LazyDatabase(() async {
         final directory = await getApplicationSupportDirectory();
+        if (Platform.isIOS) {
+          await _localStorageChannel.invokeMethod<void>(
+            'excludeApplicationSupportFromBackup',
+          );
+        }
         final databaseFile = File(path.join(directory.path, 'maltto.sqlite'));
         return NativeDatabase.createInBackground(databaseFile);
       }),

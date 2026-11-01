@@ -74,6 +74,30 @@ void main() {
     );
   });
 
+  test('SQLite CHECK가 Service를 우회한 공백 제목과 본문을 거부한다', () async {
+    Future<void> insert({required String title, required String body}) async {
+      await database
+          .into(database.scriptRows)
+          .insert(
+            ScriptRowsCompanion.insert(
+              title: title,
+              body: body,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            ),
+          );
+    }
+
+    await expectLater(
+      insert(title: ' \t\n', body: '유효한 본문'),
+      throwsA(isA<SqliteException>()),
+    );
+    await expectLater(
+      insert(title: '유효한 제목', body: '\r\n\t'),
+      throwsA(isA<SqliteException>()),
+    );
+  });
+
   test('파일 DB를 닫고 다시 열어도 긴 본문이 그대로 유지된다', () async {
     await database.close();
     final directory = await Directory.systemTemp.createTemp(

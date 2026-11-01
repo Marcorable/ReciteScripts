@@ -4,6 +4,7 @@ import 'package:maltto/src/features/scripts/presentation/script_create_view.dart
 import 'package:maltto/src/features/scripts/presentation/script_create_view_model.dart';
 import 'package:maltto/src/features/scripts/presentation/script_list_components.dart';
 import 'package:maltto/src/features/scripts/presentation/script_list_view_model.dart';
+import 'package:maltto/src/features/scripts/presentation/script_navigation_actions.dart';
 import 'package:maltto/src/shared/design/app_tokens.dart';
 
 final class ScriptListView extends StatefulWidget {
@@ -77,6 +78,14 @@ final class _ScriptListViewState extends State<ScriptListView> {
 
   @override
   Widget build(BuildContext context) {
+    final addButton = ScriptNavigationButton(
+      key: const Key('script-list-add-button'),
+      semanticLabel: '새 대본 추가',
+      onPressed: _openCreateView,
+      child: const Text('추가'),
+    );
+    final expandedActions = usesExpandedNavigationActions;
+
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.systemGroupedBackground,
       child: AnimatedBuilder(
@@ -86,19 +95,13 @@ final class _ScriptListViewState extends State<ScriptListView> {
             slivers: [
               CupertinoSliverNavigationBar(
                 largeTitle: const Text('대본'),
-                trailing: ConstrainedBox(
-                  constraints: AppTargets.preferredConstraints,
-                  child: CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: _openCreateView,
-                    child: Semantics(
-                      button: true,
-                      label: '새 대본 추가',
-                      excludeSemantics: true,
-                      child: const Text('추가'),
-                    ),
-                  ),
-                ),
+                trailing: expandedActions ? null : addButton,
+                bottom: expandedActions
+                    ? ScriptNavigationActionBar(trailing: addButton)
+                    : null,
+                bottomMode: expandedActions
+                    ? NavigationBarBottomMode.always
+                    : null,
               ),
               if (widget.viewModel.isLoading)
                 const SliverFillRemaining(

@@ -75,6 +75,50 @@ void main() {
     expect(repository.scripts, isEmpty);
   });
 
+  testWidgets('저장 실패 시 추가 화면을 유지하고 다시 시도 안내를 표시한다', (tester) async {
+    final repository = _WidgetScriptRepository(failCreate: true);
+    await tester.pumpWidget(_buildApp(repository));
+    await tester.pump();
+    await tester.tap(find.text('대본 추가'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('script-title-field')),
+      '연습 제목',
+    );
+    await tester.enterText(
+      find.byKey(const Key('script-body-field')),
+      '직접 작성한 문장을 읽습니다.',
+    );
+    await tester.tap(find.byKey(const Key('script-create-save-button')));
+    await tester.pump();
+
+    expect(find.text('저장하지 못했습니다. 다시 시도해 주세요.'), findsOneWidget);
+    expect(find.byKey(const Key('script-title-field')), findsOneWidget);
+    expect(repository.scripts, isEmpty);
+  });
+
+  testWidgets('Android 내비게이션 조작의 실제 터치 영역이 48 이상이다', (tester) async {
+    final repository = _WidgetScriptRepository();
+    await tester.pumpWidget(_buildApp(repository));
+    await tester.pumpAndSettle();
+
+    final listAddButton = find.byKey(const Key('script-list-add-button'));
+    expect(tester.getSize(listAddButton).width, greaterThanOrEqualTo(48));
+    expect(tester.getSize(listAddButton).height, greaterThanOrEqualTo(48));
+
+    await tester.tap(listAddButton);
+    await tester.pumpAndSettle();
+    for (final key in [
+      const Key('script-create-cancel-button'),
+      const Key('script-create-save-button'),
+    ]) {
+      final button = find.byKey(key);
+      expect(tester.getSize(button).width, greaterThanOrEqualTo(48));
+      expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
+    }
+  });
+
   testWidgets('큰 글씨에서 긴 제목이 줄바꿈되고 주요 터치 영역이 48 이상이다', (tester) async {
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -130,11 +174,14 @@ Script _script({required int id, required String title, required String body}) {
 }
 
 final class _WidgetScriptRepository implements ScriptRepository {
-  _WidgetScriptRepository({List<Script> initialScripts = const []})
-    : scripts = [...initialScripts];
+  _WidgetScriptRepository({
+    List<Script> initialScripts = const [],
+    this.failCreate = false,
+  }) : scripts = [...initialScripts];
 
   final _controller = StreamController<List<Script>>.broadcast();
   final List<Script> scripts;
+  final bool failCreate;
   int _nextId = 1;
 
   @override
@@ -148,6 +195,7 @@ final class _WidgetScriptRepository implements ScriptRepository {
 
   @override
   Future<Script> create({required String title, required String body}) async {
+    if (failCreate) throw StateError('저장 실패');
     final script = _script(id: _nextId++, title: title, body: body);
     scripts.insert(0, script);
     _controller.add(List.unmodifiable(scripts));

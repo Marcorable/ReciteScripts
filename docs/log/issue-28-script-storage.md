@@ -7,6 +7,7 @@
 - drift 행 타입은 infrastructure 밖으로 노출하지 않고 Repository에서 앱 `Script` 모델로 변환한다.
 - 추가와 삭제는 drift의 watch query가 목록 ViewModel에 다시 전달하므로 별도 UI 캐시를 수정하지 않는다.
 - DB 파일은 application support 디렉터리의 `maltto.sqlite`를 사용한다. 앱 시작 시 기존 파일을 열며 초기화나 삭제 코드는 두지 않았다.
+- Android는 Application Support에 해당하는 `files` 영역을 백업·기기 이전 규칙에서 제외하고, iOS는 DB를 열기 전에 Application Support 디렉터리에 백업 제외 속성을 매번 설정한다.
 - schema version을 올릴 때 `migrations/schema_migration.dart`에 버전별 데이터 보존 migration을 추가하도록 `onUpgrade` 경계를 분리했다. 등록되지 않은 migration은 DB를 재생성하지 않고 실패한다.
 
 ## 입력과 개인정보
@@ -47,3 +48,14 @@ drift 테스트는 메모리 SQLite CRUD·watch 갱신·공백 검증을 확인�
 |---|---|
 | ![Android 큰 글씨 빈 상태](images/issue-28/android-accessibility-xl-empty.png) | ![iOS 큰 글씨 빈 상태](images/issue-28/ios-accessibility-xl-empty.png) |
 | ![Android 큰 글씨 추가](images/issue-28/android-accessibility-xl-add.png) | ![iOS 큰 글씨 추가](images/issue-28/ios-accessibility-xl-add.png) |
+
+## PR 리뷰 반영 검증
+
+- Android APK manifest에서 `allowBackup=false`와 `dataExtractionRules` 포함을 확인했다. 규칙은 Application Support에 해당하는 `files` 영역을 cloud backup과 device transfer에서 제외한다.
+- iOS Simulator에서 앱을 실행한 뒤 Application Support 디렉터리에 `com.apple.metadata:com_apple_backup_excludeItem` 속성이 설정된 것을 확인했다.
+- Android API 36 Emulator 접근성 트리에서 상단 추가·취소·저장 버튼의 실제 클릭 영역이 각각 최소 48dp임을 확인했다.
+- Android 글꼴 배율 200%에서 변경된 내비게이션 조작과 입력 화면이 잘리거나 겹치지 않는지 다시 확인했다.
+
+| Android 기본 글씨 | Android 200% 빈 상태 | Android 200% 추가 |
+|---|---|---|
+| ![Android 리뷰 반영 내비게이션](images/issue-28/android-review-navigation.png) | ![Android 리뷰 반영 큰 글씨 빈 상태](images/issue-28/android-review-accessibility-xl-empty.png) | ![Android 리뷰 반영 큰 글씨 추가](images/issue-28/android-review-accessibility-xl-add.png) |

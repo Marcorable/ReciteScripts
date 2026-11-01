@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:maltto/src/features/scripts/presentation/script_create_view_model.dart';
+import 'package:maltto/src/features/scripts/presentation/script_navigation_actions.dart';
 import 'package:maltto/src/shared/design/app_tokens.dart';
 
 final class ScriptCreateView extends StatefulWidget {
@@ -46,40 +47,37 @@ final class _ScriptCreateViewState extends State<ScriptCreateView> {
 
   @override
   Widget build(BuildContext context) {
+    final cancelButton = ScriptNavigationButton(
+      key: const Key('script-create-cancel-button'),
+      semanticLabel: '대본 추가 취소',
+      onPressed: () => Navigator.of(context).pop(),
+      child: const Text('취소'),
+    );
+    final saveButton = AnimatedBuilder(
+      animation: widget.viewModel,
+      builder: (context, child) => ScriptNavigationButton(
+        key: const Key('script-create-save-button'),
+        semanticLabel: '대본 저장',
+        onPressed: widget.viewModel.isSaving ? null : _save,
+        child: widget.viewModel.isSaving
+            ? const CupertinoActivityIndicator()
+            : const Text('저장'),
+      ),
+    );
+    final expandedActions = usesExpandedNavigationActions;
+
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
+        automaticallyImplyLeading: false,
         middle: const Text('대본 추가'),
-        leading: ConstrainedBox(
-          constraints: AppTargets.preferredConstraints,
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => Navigator.of(context).pop(),
-            child: Semantics(
-              button: true,
-              label: '대본 추가 취소',
-              excludeSemantics: true,
-              child: const Text('취소'),
-            ),
-          ),
-        ),
-        trailing: AnimatedBuilder(
-          animation: widget.viewModel,
-          builder: (context, child) => ConstrainedBox(
-            constraints: AppTargets.preferredConstraints,
-            child: CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: widget.viewModel.isSaving ? null : _save,
-              child: widget.viewModel.isSaving
-                  ? const CupertinoActivityIndicator()
-                  : Semantics(
-                      button: true,
-                      label: '대본 저장',
-                      excludeSemantics: true,
-                      child: const Text('저장'),
-                    ),
-            ),
-          ),
-        ),
+        leading: expandedActions ? null : cancelButton,
+        trailing: expandedActions ? null : saveButton,
+        bottom: expandedActions
+            ? ScriptNavigationActionBar(
+                leading: cancelButton,
+                trailing: saveButton,
+              )
+            : null,
       ),
       child: SafeArea(
         child: AnimatedBuilder(
