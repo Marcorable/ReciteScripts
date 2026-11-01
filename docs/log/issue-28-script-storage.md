@@ -7,7 +7,7 @@
 - drift 행 타입은 infrastructure 밖으로 노출하지 않고 Repository에서 앱 `Script` 모델로 변환한다.
 - 추가와 삭제는 drift의 watch query가 목록 ViewModel에 다시 전달하므로 별도 UI 캐시를 수정하지 않는다.
 - DB 파일은 application support 디렉터리의 `maltto.sqlite`를 사용한다. 앱 시작 시 기존 파일을 열며 초기화나 삭제 코드는 두지 않았다.
-- Android는 Application Support에 해당하는 `files` 영역을 백업·기기 이전 규칙에서 제외하고, iOS는 DB를 열기 전에 Application Support 디렉터리에 백업 제외 속성을 매번 설정한다.
+- Android는 Application Support에 해당하는 `files` 영역을 백업·기기 이전 규칙에서 제외하고, iOS는 Pigeon 네이티브 경계를 통해 DB를 열기 전에 Application Support 디렉터리에 백업 제외 속성을 매번 설정한다.
 - schema version을 올릴 때 `migrations/schema_migration.dart`에 버전별 데이터 보존 migration을 추가하도록 `onUpgrade` 경계를 분리했다. 등록되지 않은 migration은 DB를 재생성하지 않고 실패한다.
 
 ## 입력과 개인정보
