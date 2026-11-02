@@ -33,6 +33,7 @@ final class ReadingSessionState {
 enum ReadingSessionTransition {
   ignored,
   progressed,
+  recognitionRestarted,
   repetitionCompleted,
   sessionCompleted,
   exited,

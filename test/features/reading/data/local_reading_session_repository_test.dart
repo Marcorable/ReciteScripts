@@ -115,6 +115,48 @@ void main() {
     expect(sttService.subscriptionCancelCount, 1);
   });
 
+  test('회차 도중 ended 이벤트는 진행 상태를 유지하고 인식을 재시작한다', () async {
+    await repository.start(script: _script, repetitions: 2);
+    sttService.emit(
+      const SttEvent(
+        sessionId: 'reading-1',
+        generation: 1,
+        sequence: 1,
+        kind: SttEventKind.finalResult,
+        text: '아침에는 창문을',
+      ),
+    );
+    final wordIndex = repository.state?.currentWordIndex;
+
+    sttService.emit(
+      const SttEvent(
+        sessionId: 'reading-1',
+        generation: 1,
+        sequence: 2,
+        kind: SttEventKind.ended,
+      ),
+    );
+    await pumpEventQueue(times: 10);
+
+    expect(repository.state?.status, ReadingSessionStatus.running);
+    expect(repository.state?.currentRepetition, 1);
+    expect(repository.state?.currentWordIndex, wordIndex);
+    expect(repository.state?.generation, 2);
+    expect(sttService.startedGenerations, [1, 2]);
+    expect(sttService.cancelledSessionIds, isEmpty);
+
+    sttService.emit(
+      const SttEvent(
+        sessionId: 'reading-1',
+        generation: 1,
+        sequence: 3,
+        kind: SttEventKind.ended,
+      ),
+    );
+    await pumpEventQueue(times: 10);
+    expect(sttService.startedGenerations, [1, 2]);
+  });
+
   test('나가기는 취소 완료 전 상태와 generation부터 무효화한다', () async {
     await repository.start(script: _script, repetitions: 3);
     final cancelBarrier = Completer<void>();

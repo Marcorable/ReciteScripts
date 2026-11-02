@@ -101,6 +101,36 @@ void main() {
       expect(reducer.state.currentWordIndex, 0);
     });
 
+    test('회차 도중 인식 종료는 커서를 유지하고 generation을 교체한다', () {
+      final reducer = createReducer();
+      reducer.acceptTranscript(
+        sessionId: 'session-1',
+        generation: 1,
+        sequence: 1,
+        text: '창문을 열고',
+        kind: TranscriptKind.finalResult,
+      );
+      final cursor = reducer.state.currentWordIndex;
+
+      final restarted = reducer.restartRecognition(
+        sessionId: 'session-1',
+        generation: 1,
+        sequence: 2,
+      );
+      final late = reducer.restartRecognition(
+        sessionId: 'session-1',
+        generation: 1,
+        sequence: 3,
+      );
+
+      expect(restarted, ReadingSessionTransition.recognitionRestarted);
+      expect(late, ReadingSessionTransition.ignored);
+      expect(reducer.state.status, ReadingSessionStatus.running);
+      expect(reducer.state.currentWordIndex, cursor);
+      expect(reducer.state.currentRepetition, 1);
+      expect(reducer.state.generation, 2);
+    });
+
     test('나가기는 먼저 종료하고 generation과 이후 상태를 무효화한다', () {
       final reducer = createReducer(repetitions: 3);
 

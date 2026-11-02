@@ -101,6 +101,23 @@ final class ReadingSessionReducer {
     return ReadingSessionTransition.progressed;
   }
 
+  ReadingSessionTransition restartRecognition({
+    required String sessionId,
+    required int generation,
+    required int sequence,
+  }) {
+    if (_status != ReadingSessionStatus.running ||
+        sessionId != _sessionId ||
+        generation != _generation ||
+        sequence <= _lastSequence) {
+      return ReadingSessionTransition.ignored;
+    }
+    _generation++;
+    _lastSequence = -1;
+    _progress.beginNewTranscriptSegment();
+    return ReadingSessionTransition.recognitionRestarted;
+  }
+
   ReadingSessionTransition exit() {
     if (_status != ReadingSessionStatus.running) {
       return ReadingSessionTransition.ignored;

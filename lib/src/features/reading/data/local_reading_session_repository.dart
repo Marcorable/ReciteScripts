@@ -93,9 +93,31 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
 
   void _handleSttEvent(SttEvent event) {
     final reducer = _reducer;
-    if (reducer == null ||
-        (event.kind != SttEventKind.partial &&
-            event.kind != SttEventKind.finalResult)) {
+    if (reducer == null) return;
+
+    if (event.kind == SttEventKind.ended) {
+      final transition = reducer.restartRecognition(
+        sessionId: event.sessionId,
+        generation: event.generation,
+        sequence: event.sequence,
+      );
+      if (transition == ReadingSessionTransition.ignored) return;
+
+      final nextState = reducer.state;
+      _emit();
+      _enqueueResourceOperation(() async {
+        final current = _reducer?.state;
+        if (current?.status != ReadingSessionStatus.running ||
+            current?.generation != nextState.generation) {
+          return;
+        }
+        await _sttService.start(_requestFor(nextState));
+      });
+      return;
+    }
+
+    if (event.kind != SttEventKind.partial &&
+        event.kind != SttEventKind.finalResult) {
       return;
     }
     final text = event.text;
