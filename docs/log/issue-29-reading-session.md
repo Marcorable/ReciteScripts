@@ -26,7 +26,7 @@
 - `./scripts/test.sh`: 통과
   - `dart format --output=none --set-exit-if-changed .`
   - `flutter analyze`
-  - 순수 Dart, Repository, 위젯을 포함한 Flutter 테스트 68개
+  - 순수 Dart, Repository, 위젯을 포함한 Flutter 테스트 69개
 - `flutter build apk --debug`: 통과
 - `DEVELOPER_DIR=/Applications/Xcode-26.2.0.app/Contents/Developer flutter build ios --simulator --debug --no-codesign`: 통과
 - `scripts/check_public_repo.sh`: 통과

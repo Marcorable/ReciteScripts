@@ -85,6 +85,7 @@ final class ReadingProgress {
 
   /// 후퇴 전에 시작된 늦은 전사 이벤트를 모두 폐기한 뒤 새 구간을 연다.
   void beginNewTranscriptSegment() {
+    _anchor = _cursor;
     _pendingFinalText = '';
     _requiresTranscriptReset = false;
   }

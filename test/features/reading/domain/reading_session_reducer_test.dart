@@ -131,6 +131,41 @@ void main() {
       expect(reducer.state.generation, 2);
     });
 
+    test('partial 진행 후 재시작은 보존된 커서부터 남은 전사를 매칭한다', () {
+      const longScript =
+          'alpha bravo charlie delta echo foxtrot golf hotel zulu';
+      final reducer = ReadingSessionReducer(
+        sessionId: 'session-1',
+        scriptTitle: '긴 문장 연습',
+        script: longScript,
+        totalRepetitions: 1,
+      );
+      reducer.acceptTranscript(
+        sessionId: 'session-1',
+        generation: 1,
+        sequence: 1,
+        text: 'alpha bravo charlie delta echo foxtrot golf hotel',
+        kind: TranscriptKind.partial,
+      );
+      expect(reducer.state.currentWordIndex, 8);
+
+      reducer.restartRecognition(
+        sessionId: 'session-1',
+        generation: 1,
+        sequence: 2,
+      );
+      final completed = reducer.acceptTranscript(
+        sessionId: 'session-1',
+        generation: 2,
+        sequence: 1,
+        text: 'zulu',
+        kind: TranscriptKind.finalResult,
+      );
+
+      expect(completed, ReadingSessionTransition.sessionCompleted);
+      expect(reducer.state.status, ReadingSessionStatus.completed);
+    });
+
     test('현재 generation의 복구 불가 인식 실패는 세션을 종료한다', () {
       final reducer = createReducer();
 
