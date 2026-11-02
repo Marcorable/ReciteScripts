@@ -131,6 +131,26 @@ void main() {
       expect(reducer.state.generation, 2);
     });
 
+    test('현재 generation의 복구 불가 인식 실패는 세션을 종료한다', () {
+      final reducer = createReducer();
+
+      final exited = reducer.exitAfterRecognitionFailure(
+        sessionId: 'session-1',
+        generation: 1,
+        sequence: 1,
+      );
+      final duplicate = reducer.exitAfterRecognitionFailure(
+        sessionId: 'session-1',
+        generation: 1,
+        sequence: 2,
+      );
+
+      expect(exited, ReadingSessionTransition.exited);
+      expect(duplicate, ReadingSessionTransition.ignored);
+      expect(reducer.state.status, ReadingSessionStatus.exited);
+      expect(reducer.state.generation, 2);
+    });
+
     test('나가기는 먼저 종료하고 generation과 이후 상태를 무효화한다', () {
       final reducer = createReducer(repetitions: 3);
 

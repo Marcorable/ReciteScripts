@@ -118,6 +118,20 @@ final class ReadingSessionReducer {
     return ReadingSessionTransition.recognitionRestarted;
   }
 
+  ReadingSessionTransition exitAfterRecognitionFailure({
+    required String sessionId,
+    required int generation,
+    required int sequence,
+  }) {
+    if (_status != ReadingSessionStatus.running ||
+        sessionId != _sessionId ||
+        generation != _generation ||
+        sequence <= _lastSequence) {
+      return ReadingSessionTransition.ignored;
+    }
+    return exit();
+  }
+
   ReadingSessionTransition exit() {
     if (_status != ReadingSessionStatus.running) {
       return ReadingSessionTransition.ignored;

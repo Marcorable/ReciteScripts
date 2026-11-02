@@ -157,6 +157,74 @@ void main() {
     expect(sttService.startedGenerations, [1, 2]);
   });
 
+  test('retryable failure는 진행 상태를 유지하고 인식을 재시작한다', () async {
+    await repository.start(script: _script, repetitions: 1);
+    sttService.emit(
+      const SttEvent(
+        sessionId: 'reading-1',
+        generation: 1,
+        sequence: 1,
+        kind: SttEventKind.failure,
+        failureCode: SttFailureCode.noMatch,
+        retryable: true,
+      ),
+    );
+    await pumpEventQueue(times: 10);
+
+    expect(repository.state?.status, ReadingSessionStatus.running);
+    expect(repository.state?.currentWordIndex, 0);
+    expect(repository.state?.generation, 2);
+    expect(sttService.startedGenerations, [1, 2]);
+  });
+
+  test('복구 불가 failure는 세션을 종료하고 모든 자원을 정리한다', () async {
+    await repository.start(script: _script, repetitions: 1);
+    sttService.emit(
+      const SttEvent(
+        sessionId: 'reading-1',
+        generation: 1,
+        sequence: 1,
+        kind: SttEventKind.failure,
+        failureCode: SttFailureCode.permissionDenied,
+        retryable: false,
+      ),
+    );
+    await pumpEventQueue(times: 10);
+
+    expect(repository.state?.status, ReadingSessionStatus.exited);
+    expect(sttService.cancelledSessionIds, ['reading-1']);
+    expect(sttService.subscriptionCancelCount, 1);
+    expect(timerFactory.timer.isActive, isFalse);
+  });
+
+  test('dispose는 시작 중인 STT 작업을 무효화하고 timer를 만들지 않는다', () async {
+    final startBarrier = Completer<void>();
+    sttService.startBarrier = startBarrier;
+    final startFuture = repository.start(script: _script, repetitions: 1);
+    await pumpEventQueue(times: 10);
+    expect(sttService.startedGenerations, [1]);
+
+    final disposeFuture = repository.dispose();
+    await pumpEventQueue(times: 10);
+    startBarrier.complete();
+
+    await expectLater(startFuture, throwsA(isA<StateError>()));
+    await disposeFuture;
+    expect(timerFactory.createCount, 0);
+    expect(sttService.disposeCount, 1);
+  });
+
+  test('나가기는 네이티브 취소 오류에도 종료 상태와 구독 정리를 유지한다', () async {
+    await repository.start(script: _script, repetitions: 1);
+    sttService.cancelError = StateError('취소 실패');
+
+    await repository.leave();
+
+    expect(repository.state?.status, ReadingSessionStatus.exited);
+    expect(sttService.subscriptionCancelCount, 1);
+    expect(timerFactory.timer.isActive, isFalse);
+  });
+
   test('나가기는 취소 완료 전 상태와 generation부터 무효화한다', () async {
     await repository.start(script: _script, repetitions: 3);
     final cancelBarrier = Completer<void>();
@@ -238,8 +306,10 @@ final _script = Script(
 
 final class _FakeTimerFactory {
   late _FakeTimer timer;
+  int createCount = 0;
 
   ReadingSessionTimer create(void Function() onTick) {
+    createCount++;
     timer = _FakeTimer(onTick);
     return timer;
   }
@@ -281,6 +351,9 @@ final class _FakeSttService implements SttService {
     status: SttPreparationStatus.modelDownloading,
   );
   int modelDownloadRequestCount = 0;
+  int disposeCount = 0;
+  Completer<void>? startBarrier;
+  Object? cancelError;
 
   void emit(SttEvent event) => _events.add(event);
 
@@ -305,14 +378,17 @@ final class _FakeSttService implements SttService {
   @override
   Future<void> start(SttStartRequest request) async {
     startedGenerations.add(request.generation);
+    await startBarrier?.future;
   }
 
   @override
   Future<void> cancel(String sessionId) async {
     cancelledSessionIds.add(sessionId);
     await cancelBarrier?.future;
+    final cancelError = this.cancelError;
+    if (cancelError != null) throw cancelError;
   }
 
   @override
-  Future<void> dispose() async {}
+  Future<void> dispose() async => disposeCount++;
 }

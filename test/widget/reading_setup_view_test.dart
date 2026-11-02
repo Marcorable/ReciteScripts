@@ -25,6 +25,7 @@ void main() {
 
     await tester.pumpWidget(_buildApp(scriptRepository, readingRepository));
     await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('대본 ${_script.title} 선택'), findsOneWidget);
     await tester.tap(find.text(_script.title));
     await tester.pumpAndSettle();
 

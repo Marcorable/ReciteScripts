@@ -76,6 +76,7 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
 
       try {
         await _sttService.start(_requestFor(initialState));
+        _ensureActive();
       } on Object {
         reducer.exit();
         await _cleanUpActiveResources(initialState.sessionId);
@@ -95,24 +96,26 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
     final reducer = _reducer;
     if (reducer == null) return;
 
-    if (event.kind == SttEventKind.ended) {
-      final transition = reducer.restartRecognition(
+    if (event.kind == SttEventKind.ended ||
+        (event.kind == SttEventKind.failure && event.retryable == true)) {
+      _restartRecognition(reducer, event);
+      return;
+    }
+
+    if (event.kind == SttEventKind.failure) {
+      final transition = reducer.exitAfterRecognitionFailure(
         sessionId: event.sessionId,
         generation: event.generation,
         sequence: event.sequence,
       );
       if (transition == ReadingSessionTransition.ignored) return;
 
-      final nextState = reducer.state;
+      _stopTimer();
       _emit();
-      _enqueueResourceOperation(() async {
-        final current = _reducer?.state;
-        if (current?.status != ReadingSessionStatus.running ||
-            current?.generation != nextState.generation) {
-          return;
-        }
-        await _sttService.start(_requestFor(nextState));
-      });
+      final exitedState = reducer.state;
+      _enqueueResourceOperation(
+        () => _cleanUpActiveResources(exitedState.sessionId),
+      );
       return;
     }
 
@@ -155,6 +158,26 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
     }
   }
 
+  void _restartRecognition(ReadingSessionReducer reducer, SttEvent event) {
+    final transition = reducer.restartRecognition(
+      sessionId: event.sessionId,
+      generation: event.generation,
+      sequence: event.sequence,
+    );
+    if (transition == ReadingSessionTransition.ignored) return;
+
+    final nextState = reducer.state;
+    _emit();
+    _enqueueResourceOperation(() async {
+      final current = _reducer?.state;
+      if (current?.status != ReadingSessionStatus.running ||
+          current?.generation != nextState.generation) {
+        return;
+      }
+      await _sttService.start(_requestFor(nextState));
+    });
+  }
+
   void _updateElapsed() {
     final reducer = _reducer;
     final startedAt = _startedAt;
@@ -177,7 +200,11 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
     _stopTimer();
     final sessionId = reducer.state.sessionId;
     await _resourceOperation;
-    await _cleanUpActiveResources(sessionId);
+    try {
+      await _cleanUpActiveResources(sessionId);
+    } on Object {
+      // 상태는 이미 종료됐다. 정리 오류가 화면 이동과 dispose를 막지 않게 한다.
+    }
   }
 
   void _enqueueResourceOperation(Future<void> Function() operation) {
@@ -240,8 +267,8 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
   @override
   Future<void> dispose() async {
     if (_disposed) return;
-    await leave();
     _disposed = true;
+    await leave();
     await _resourceOperation;
     await _sttService.dispose();
     await _states.close();
