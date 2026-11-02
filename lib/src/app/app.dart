@@ -1,11 +1,33 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
+import 'package:maltto/src/features/scripts/presentation/script_create_view_model.dart';
 import 'package:maltto/src/features/scripts/presentation/script_list_view.dart';
 import 'package:maltto/src/features/scripts/presentation/script_list_view_model.dart';
 
-final class MalttoApp extends StatelessWidget {
-  const MalttoApp({required this.scriptListViewModel, super.key});
+final class MalttoApp extends StatefulWidget {
+  const MalttoApp({
+    required this.scriptListViewModel,
+    required this.createScriptViewModel,
+    this.onDispose,
+    super.key,
+  });
 
   final ScriptListViewModel scriptListViewModel;
+  final ScriptCreateViewModel Function() createScriptViewModel;
+  final Future<void> Function()? onDispose;
+
+  @override
+  State<MalttoApp> createState() => _MalttoAppState();
+}
+
+final class _MalttoAppState extends State<MalttoApp> {
+  @override
+  void dispose() {
+    widget.scriptListViewModel.dispose();
+    unawaited(widget.onDispose?.call());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +38,10 @@ final class MalttoApp extends StatelessWidget {
         primaryColor: CupertinoColors.systemBlue,
         scaffoldBackgroundColor: CupertinoColors.systemBackground,
       ),
-      home: ScriptListView(viewModel: scriptListViewModel),
+      home: ScriptListView(
+        viewModel: widget.scriptListViewModel,
+        createScriptViewModel: widget.createScriptViewModel,
+      ),
     );
   }
 }

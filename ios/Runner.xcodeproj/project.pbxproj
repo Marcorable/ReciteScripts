@@ -15,6 +15,8 @@
 		A26000010000000000000001 /* SttApi.g.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26000020000000000000001 /* SttApi.g.swift */; };
 		A26000030000000000000001 /* IosSpeechAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26000040000000000000001 /* IosSpeechAdapter.swift */; };
 		A26000050000000000000001 /* IosSpeechSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26000060000000000000001 /* IosSpeechSession.swift */; };
+		A28000010000000000000001 /* LocalStorageApi.g.swift in Sources */ = {isa = PBXBuildFile; fileRef = A28000020000000000000001 /* LocalStorageApi.g.swift */; };
+		A28000030000000000000001 /* IosLocalStorageAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A28000040000000000000001 /* IosLocalStorageAdapter.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
@@ -56,6 +58,8 @@
 		A26000020000000000000001 /* SttApi.g.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Generated/SttApi.g.swift; sourceTree = "<group>"; };
 		A26000040000000000000001 /* IosSpeechAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosSpeechAdapter.swift; sourceTree = "<group>"; };
 		A26000060000000000000001 /* IosSpeechSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosSpeechSession.swift; sourceTree = "<group>"; };
+		A28000020000000000000001 /* LocalStorageApi.g.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Generated/LocalStorageApi.g.swift; sourceTree = "<group>"; };
+		A28000040000000000000001 /* IosLocalStorageAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosLocalStorageAdapter.swift; sourceTree = "<group>"; };
 		78E0A7A72DC9AD7400C4905E /* FlutterGeneratedPluginSwiftPackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FlutterGeneratedPluginSwiftPackage; path = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
@@ -132,6 +136,8 @@
 				A26000020000000000000001 /* SttApi.g.swift */,
 				A26000040000000000000001 /* IosSpeechAdapter.swift */,
 				A26000060000000000000001 /* IosSpeechSession.swift */,
+				A28000020000000000000001 /* LocalStorageApi.g.swift */,
+				A28000040000000000000001 /* IosLocalStorageAdapter.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
 			path = Runner;
@@ -294,6 +300,8 @@
 				A26000010000000000000001 /* SttApi.g.swift in Sources */,
 				A26000030000000000000001 /* IosSpeechAdapter.swift in Sources */,
 				A26000050000000000000001 /* IosSpeechSession.swift in Sources */,
+				A28000010000000000000001 /* LocalStorageApi.g.swift in Sources */,
+				A28000030000000000000001 /* IosLocalStorageAdapter.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 			);

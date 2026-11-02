@@ -4,6 +4,7 @@ import UIKit
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var speechAdapter: IosSpeechAdapter?
+  private var localStorageAdapter: IosLocalStorageAdapter?
 
   override func application(
     _ application: UIApplication,
@@ -14,11 +15,17 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "IosSpeechAdapter") else {
-      return
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "IosSpeechAdapter") {
+      let adapter = IosSpeechAdapter(binaryMessenger: registrar.messenger())
+      NativeSttHostApiSetup.setUp(binaryMessenger: registrar.messenger(), api: adapter)
+      speechAdapter = adapter
     }
-    let adapter = IosSpeechAdapter(binaryMessenger: registrar.messenger())
-    NativeSttHostApiSetup.setUp(binaryMessenger: registrar.messenger(), api: adapter)
-    speechAdapter = adapter
+
+    guard let registrar = engineBridge.pluginRegistry.registrar(
+      forPlugin: "IosLocalStorageBackupExcluder"
+    ) else { return }
+    let adapter = IosLocalStorageAdapter()
+    LocalStorageHostApiSetup.setUp(binaryMessenger: registrar.messenger(), api: adapter)
+    localStorageAdapter = adapter
   }
 }
