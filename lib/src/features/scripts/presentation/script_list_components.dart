@@ -67,11 +67,13 @@ final class ScriptLoadError extends StatelessWidget {
 final class ScriptListTile extends StatelessWidget {
   const ScriptListTile({
     required this.script,
+    required this.onSelected,
     required this.onDelete,
     super.key,
   });
 
   final Script script;
+  final VoidCallback onSelected;
   final VoidCallback onDelete;
 
   @override
@@ -93,11 +95,18 @@ final class ScriptListTile extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: Padding(
+                    child: CupertinoButton(
                       padding: const EdgeInsets.symmetric(
                         vertical: AppSpacing.large,
                       ),
-                      child: Text(script.title),
+                      alignment: Alignment.centerLeft,
+                      onPressed: onSelected,
+                      child: Semantics(
+                        button: true,
+                        label: '대본 ${script.title} 선택',
+                        excludeSemantics: true,
+                        child: Text(script.title),
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.small),

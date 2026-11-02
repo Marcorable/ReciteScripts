@@ -159,6 +159,7 @@ Widget _buildApp(_WidgetScriptRepository repository) {
   return MalttoApp(
     scriptListViewModel: ScriptListViewModel(repository),
     createScriptViewModel: () => ScriptCreateViewModel(repository),
+    readingSetupBuilder: (_) => const SizedBox.shrink(),
   );
 }
 

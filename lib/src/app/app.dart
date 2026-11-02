@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:maltto/src/features/scripts/model/script.dart';
 import 'package:maltto/src/features/scripts/presentation/script_create_view_model.dart';
 import 'package:maltto/src/features/scripts/presentation/script_list_view.dart';
 import 'package:maltto/src/features/scripts/presentation/script_list_view_model.dart';
@@ -9,12 +10,14 @@ final class MalttoApp extends StatefulWidget {
   const MalttoApp({
     required this.scriptListViewModel,
     required this.createScriptViewModel,
+    required this.readingSetupBuilder,
     this.onDispose,
     super.key,
   });
 
   final ScriptListViewModel scriptListViewModel;
   final ScriptCreateViewModel Function() createScriptViewModel;
+  final Widget Function(Script script) readingSetupBuilder;
   final Future<void> Function()? onDispose;
 
   @override
@@ -41,6 +44,7 @@ final class _MalttoAppState extends State<MalttoApp> {
       home: ScriptListView(
         viewModel: widget.scriptListViewModel,
         createScriptViewModel: widget.createScriptViewModel,
+        readingSetupBuilder: widget.readingSetupBuilder,
       ),
     );
   }
