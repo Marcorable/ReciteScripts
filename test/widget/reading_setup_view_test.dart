@@ -141,6 +141,37 @@ void main() {
       isNotNull,
     );
   });
+
+  testWidgets('시작 준비 중 백그라운드 전환은 시작 요청을 취소한다', (tester) async {
+    final startBarrier = Completer<void>();
+    final readingRepository = _ReadingRepository(startBarrier: startBarrier);
+    addTearDown(() async {
+      if (!startBarrier.isCompleted) startBarrier.complete();
+      await readingRepository.dispose();
+    });
+
+    await tester.pumpWidget(
+      CupertinoApp(
+        home: ReadingSetupView(
+          viewModel: ReadingSetupViewModel(
+            script: _script,
+            repository: readingRepository,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('reading-setup-start-button')));
+    await tester.pump();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    expect(readingRepository.leaveCallCount, 1);
+
+    startBarrier.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('reading-current-word')), findsNothing);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+  });
 }
 
 Widget _buildApp(
@@ -191,14 +222,16 @@ final class _ScriptRepository implements ScriptRepository {
 }
 
 final class _ReadingRepository implements ReadingSessionRepository {
-  _ReadingRepository({this.startException});
+  _ReadingRepository({this.startException, this.startBarrier});
 
   final ReadingSessionStartException? startException;
+  final Completer<void>? startBarrier;
   final StreamController<ReadingSessionState> _controller =
       StreamController<ReadingSessionState>.broadcast(sync: true);
 
   Script? startedScript;
   int? startedRepetitions;
+  int leaveCallCount = 0;
   ReadingSessionState? _state;
 
   @override
@@ -212,6 +245,8 @@ final class _ReadingRepository implements ReadingSessionRepository {
     required Script script,
     required int repetitions,
   }) async {
+    await startBarrier?.future;
+    if (leaveCallCount > 0) throw StateError('시작 취소');
     final startException = this.startException;
     if (startException != null) throw startException;
     startedScript = script;
@@ -233,6 +268,7 @@ final class _ReadingRepository implements ReadingSessionRepository {
 
   @override
   Future<void> leave() async {
+    leaveCallCount++;
     final current = _state;
     if (current == null || current.status != ReadingSessionStatus.running) {
       return;

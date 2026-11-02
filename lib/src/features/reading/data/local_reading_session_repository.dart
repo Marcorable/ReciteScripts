@@ -33,6 +33,7 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
   DateTime? _startedAt;
   Future<void> _resourceOperation = Future.value();
   int _nextSessionId = 1;
+  int _startAttempt = 0;
   bool _isStarting = false;
   bool _disposed = false;
 
@@ -53,11 +54,13 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
       throw StateError('이미 실행 중인 낭독 세션이 있습니다.');
     }
     _isStarting = true;
+    final startAttempt = ++_startAttempt;
     try {
       await _resourceOperation;
+      _ensureStartActive(startAttempt);
 
       final preparation = await _prepareStt();
-      _ensureActive();
+      _ensureStartActive(startAttempt);
       if (preparation.status != SttPreparationStatus.ready) {
         throw ReadingSessionStartException(preparation);
       }
@@ -76,7 +79,7 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
 
       try {
         await _sttService.start(_requestFor(initialState));
-        _ensureActive();
+        _ensureStartActive(startAttempt);
       } on Object {
         reducer.exit();
         await _cleanUpActiveResources(initialState.sessionId);
@@ -190,6 +193,7 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
 
   @override
   Future<void> leave() async {
+    _startAttempt++;
     final reducer = _reducer;
     if (reducer == null) return;
 
@@ -276,5 +280,12 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
 
   void _ensureActive() {
     if (_disposed) throw StateError('ReadingSessionRepository가 종료되었습니다.');
+  }
+
+  void _ensureStartActive(int startAttempt) {
+    _ensureActive();
+    if (startAttempt != _startAttempt) {
+      throw StateError('낭독 시작 요청이 취소되었습니다.');
+    }
   }
 }

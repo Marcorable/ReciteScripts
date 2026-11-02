@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:maltto/src/features/reading/presentation/reading_setup_view_model.dart';
 import 'package:maltto/src/features/reading/presentation/reading_view.dart';
@@ -13,15 +15,26 @@ final class ReadingSetupView extends StatefulWidget {
   State<ReadingSetupView> createState() => _ReadingSetupViewState();
 }
 
-final class _ReadingSetupViewState extends State<ReadingSetupView> {
+final class _ReadingSetupViewState extends State<ReadingSetupView>
+    with WidgetsBindingObserver {
   late final FixedExtentScrollController _pickerController;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pickerController = FixedExtentScrollController(
       initialItem: widget.viewModel.repetitions - 1,
     );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      unawaited(widget.viewModel.cancelStart());
+    }
   }
 
   Future<void> _start() async {
@@ -41,6 +54,7 @@ final class _ReadingSetupViewState extends State<ReadingSetupView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pickerController.dispose();
     widget.viewModel.dispose();
     super.dispose();

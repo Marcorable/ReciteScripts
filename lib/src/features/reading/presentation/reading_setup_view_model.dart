@@ -73,6 +73,11 @@ final class ReadingSetupViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> cancelStart() async {
+    if (!_isStarting) return;
+    await repository.leave();
+  }
+
   @override
   void dispose() {
     _disposed = true;

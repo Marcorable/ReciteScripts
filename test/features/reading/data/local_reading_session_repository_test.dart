@@ -214,6 +214,22 @@ void main() {
     expect(sttService.disposeCount, 1);
   });
 
+  test('준비 중 나가기는 시작 요청을 무효화하고 STT를 시작하지 않는다', () async {
+    final prepareBarrier = Completer<void>();
+    sttService.prepareBarrier = prepareBarrier;
+    final startFuture = repository.start(script: _script, repetitions: 1);
+    await pumpEventQueue(times: 10);
+    expect(sttService.prepareCallCount, 1);
+
+    await repository.leave();
+    prepareBarrier.complete();
+
+    await expectLater(startFuture, throwsA(isA<StateError>()));
+    expect(repository.state, isNull);
+    expect(sttService.startedGenerations, isEmpty);
+    expect(timerFactory.createCount, 0);
+  });
+
   test('나가기는 네이티브 취소 오류에도 종료 상태와 구독 정리를 유지한다', () async {
     await repository.start(script: _script, repetitions: 1);
     sttService.cancelError = StateError('취소 실패');
@@ -352,7 +368,9 @@ final class _FakeSttService implements SttService {
   );
   int modelDownloadRequestCount = 0;
   int disposeCount = 0;
+  int prepareCallCount = 0;
   Completer<void>? startBarrier;
+  Completer<void>? prepareBarrier;
   Object? cancelError;
 
   void emit(SttEvent event) => _events.add(event);
@@ -364,7 +382,11 @@ final class _FakeSttService implements SttService {
       throw UnimplementedError();
 
   @override
-  Future<SttPreparation> prepare({required String locale}) async => preparation;
+  Future<SttPreparation> prepare({required String locale}) async {
+    prepareCallCount++;
+    await prepareBarrier?.future;
+    return preparation;
+  }
 
   @override
   Future<SttPreparation> requestModelDownload({required String locale}) async {

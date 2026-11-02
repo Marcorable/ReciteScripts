@@ -16,6 +16,8 @@
   교체한 뒤 인식을 재시작한다.
 - 복구 가능한 STT `failure`는 같은 위치에서 새 generation으로 재시작하고,
   복구할 수 없는 실패는 먼저 세션을 종료한 뒤 자원을 정리한다.
+- 시작 준비 중 앱이 백그라운드로 가면 현재 시작 attempt를 무효화해 준비
+  완료 후 마이크가 늤어서 시작되지 않게 한다.
 - 최소 낭독 상태 화면은 여러 회일 때만 현재/전체 회차를 표시한다. 전체 대본
   하이라이트·자동 스크롤·한 어절 뒤로 UI는 Issue #30 범위로 남겼다.
 - 시스템 설정 열기·자동 재시도 등 완성된 STT 실패·복구 UI는
@@ -26,7 +28,7 @@
 - `./scripts/test.sh`: 통과
   - `dart format --output=none --set-exit-if-changed .`
   - `flutter analyze`
-  - 순수 Dart, Repository, 위젯을 포함한 Flutter 테스트 69개
+  - 순수 Dart, Repository, 위젯을 포함한 Flutter 테스트 71개
 - `flutter build apk --debug`: 통과
 - `DEVELOPER_DIR=/Applications/Xcode-26.2.0.app/Contents/Developer flutter build ios --simulator --debug --no-codesign`: 통과
 - `scripts/check_public_repo.sh`: 통과
