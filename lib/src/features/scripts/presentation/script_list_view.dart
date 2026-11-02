@@ -11,11 +11,13 @@ final class ScriptListView extends StatefulWidget {
   const ScriptListView({
     required this.viewModel,
     required this.createScriptViewModel,
+    required this.readingSetupBuilder,
     super.key,
   });
 
   final ScriptListViewModel viewModel;
   final ScriptCreateViewModel Function() createScriptViewModel;
+  final Widget Function(Script script) readingSetupBuilder;
 
   @override
   State<ScriptListView> createState() => _ScriptListViewState();
@@ -33,6 +35,14 @@ final class _ScriptListViewState extends State<ScriptListView> {
       CupertinoPageRoute<void>(
         builder: (_) =>
             ScriptCreateView(viewModel: widget.createScriptViewModel()),
+      ),
+    );
+  }
+
+  Future<void> _openReadingSetup(Script script) async {
+    await Navigator.of(context).push<void>(
+      CupertinoPageRoute<void>(
+        builder: (_) => widget.readingSetupBuilder(script),
       ),
     );
   }
@@ -129,6 +139,7 @@ final class _ScriptListViewState extends State<ScriptListView> {
                       final script = widget.viewModel.scripts[index];
                       return ScriptListTile(
                         script: script,
+                        onSelected: () => _openReadingSetup(script),
                         onDelete: () => _confirmDelete(script),
                       );
                     },
