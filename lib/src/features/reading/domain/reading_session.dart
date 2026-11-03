@@ -9,6 +9,7 @@ final class ReadingSessionState {
     required this.totalRepetitions,
     required this.currentWordIndex,
     required this.currentWord,
+    required this.words,
     required this.totalWords,
     required this.elapsed,
     required this.generation,
@@ -21,6 +22,7 @@ final class ReadingSessionState {
   final int totalRepetitions;
   final int? currentWordIndex;
   final String? currentWord;
+  final List<String> words;
   final int totalWords;
   final Duration elapsed;
 
@@ -33,6 +35,7 @@ final class ReadingSessionState {
 enum ReadingSessionTransition {
   ignored,
   progressed,
+  movedBack,
   recognitionRestarted,
   repetitionCompleted,
   sessionCompleted,

@@ -24,6 +24,8 @@ final class ReadingViewModel extends ChangeNotifier {
 
   ReadingSessionState get state => _state;
 
+  Future<void> moveBackOneWord() => _repository.moveBackOneWord();
+
   Future<void> leave() => _repository.leave();
 
   @override

@@ -131,6 +131,61 @@ void main() {
       expect(reducer.state.generation, 2);
     });
 
+    test('한 어절 뒤로는 커서 하나와 generation만 교체하고 첫 어절에서 멈춘다', () {
+      final reducer = createReducer();
+      reducer.acceptTranscript(
+        sessionId: 'session-1',
+        generation: 1,
+        sequence: 1,
+        text: '창문을 열고 천천히',
+        kind: TranscriptKind.finalResult,
+      );
+
+      expect(reducer.moveBackOneWord(), ReadingSessionTransition.movedBack);
+      expect(reducer.state.currentWordIndex, 2);
+      expect(reducer.state.currentWord, '천천히');
+      expect(reducer.state.generation, 2);
+
+      expect(reducer.moveBackOneWord(), ReadingSessionTransition.movedBack);
+      expect(reducer.moveBackOneWord(), ReadingSessionTransition.movedBack);
+      expect(reducer.state.currentWordIndex, 0);
+      final generationAtStart = reducer.state.generation;
+      expect(reducer.moveBackOneWord(), ReadingSessionTransition.ignored);
+      expect(reducer.state.currentWordIndex, 0);
+      expect(reducer.state.generation, generationAtStart);
+    });
+
+    test('후퇴 전 generation의 늦은 결과는 무시하고 새 구간에서 진행한다', () {
+      final reducer = createReducer();
+      reducer.acceptTranscript(
+        sessionId: 'session-1',
+        generation: 1,
+        sequence: 1,
+        text: '창문을 열고 천천히',
+        kind: TranscriptKind.finalResult,
+      );
+      reducer.moveBackOneWord();
+
+      final late = reducer.acceptTranscript(
+        sessionId: 'session-1',
+        generation: 1,
+        sequence: 2,
+        text: script,
+        kind: TranscriptKind.finalResult,
+      );
+      final resumed = reducer.acceptTranscript(
+        sessionId: 'session-1',
+        generation: 2,
+        sequence: 1,
+        text: '천천히 문장을 읽는다',
+        kind: TranscriptKind.finalResult,
+      );
+
+      expect(late, ReadingSessionTransition.ignored);
+      expect(resumed, ReadingSessionTransition.sessionCompleted);
+      expect(reducer.state.status, ReadingSessionStatus.completed);
+    });
+
     test('partial 진행 후 재시작은 보존된 커서부터 남은 전사를 매칭한다', () {
       const longScript =
           'alpha bravo charlie delta echo foxtrot golf hotel zulu';

@@ -192,6 +192,26 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
   }
 
   @override
+  Future<void> moveBackOneWord() async {
+    final reducer = _reducer;
+    if (reducer == null) return;
+    final transition = reducer.moveBackOneWord();
+    if (transition == ReadingSessionTransition.ignored) return;
+
+    final nextState = reducer.state;
+    _emit();
+    _enqueueResourceOperation(() async {
+      await _sttService.cancel(nextState.sessionId);
+      final current = _reducer?.state;
+      if (current?.status != ReadingSessionStatus.running ||
+          current?.generation != nextState.generation) {
+        return;
+      }
+      await _sttService.start(_requestFor(nextState));
+    });
+  }
+
+  @override
   Future<void> leave() async {
     _startAttempt++;
     final reducer = _reducer;

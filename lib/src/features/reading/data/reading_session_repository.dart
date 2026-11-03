@@ -18,6 +18,8 @@ abstract interface class ReadingSessionRepository {
     required int repetitions,
   });
 
+  Future<void> moveBackOneWord();
+
   Future<void> leave();
 
   Future<void> dispose();
