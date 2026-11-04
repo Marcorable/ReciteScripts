@@ -40,7 +40,7 @@ internal class AndroidSpeechAdapter(
     private var activeSession: AndroidSpeechSession? = null
     private var pendingStart: StartReservation? = null
     private val modelStatusCache = mutableMapOf<String, NativeSttModelStatus>()
-    private val audioSourceSupportCache = mutableMapOf<String, Boolean>()
+    private val audioSourceSupportedLocales = mutableSetOf<String>()
     private val supportRecognizers = mutableSetOf<SpeechRecognizer>()
     private val modelDownloadRecognizers = mutableMapOf<String, SpeechRecognizer>()
     private var disposed = false
@@ -169,8 +169,10 @@ internal class AndroidSpeechAdapter(
                 NativeSttModelStatus.UNSUPPORTED ->
                     throw FlutterError("localeUnsupported", "The locale is unsupported.")
             }
+            val audioSourceSupported = supportsAudioSource(request.locale)
+            ensurePending(reservation)
             val audioSource =
-                if (supportsAudioSource(request.locale)) {
+                if (audioSourceSupported) {
                     AndroidRecognitionAudioSource.create()
                 } else {
                     null
@@ -226,7 +228,7 @@ internal class AndroidSpeechAdapter(
         destroySupportRecognizers()
         destroyModelDownloadRecognizers()
         modelStatusCache.clear()
-        audioSourceSupportCache.clear()
+        audioSourceSupportedLocales.clear()
         eventScope.cancel()
     }
 
@@ -253,7 +255,7 @@ internal class AndroidSpeechAdapter(
         destroySupportRecognizers()
         destroyModelDownloadRecognizers()
         modelStatusCache.clear()
-        audioSourceSupportCache.clear()
+        audioSourceSupportedLocales.clear()
         eventScope.cancel()
     }
 
@@ -268,14 +270,14 @@ internal class AndroidSpeechAdapter(
 
     private suspend fun supportsAudioSource(locale: String): Boolean {
         val key = localeKey(locale)
-        audioSourceSupportCache[key]?.let { return it }
+        if (key in audioSourceSupportedLocales) return true
         val probe = RecognitionAudioSourceSupportProbe.create()
         val supported = try {
             queryIntentSupport(recognitionIntent(locale, probe))
         } finally {
             probe.close()
         }
-        audioSourceSupportCache[key] = supported
+        if (supported) audioSourceSupportedLocales += key
         return supported
     }
 
