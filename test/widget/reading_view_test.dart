@@ -136,6 +136,60 @@ void main() {
     expect(repository.state?.status, ReadingSessionStatus.exited);
   });
 
+  testWidgets('회차 완료는 중앙 확인창에서 이어하기 전까지 다음 STT를 대기한다', (tester) async {
+    final repository = _ReadingRepository(
+      _state(currentWordIndex: 3, totalRepetitions: 2),
+    );
+    await _pumpView(tester, repository);
+
+    repository.emit(
+      _state(
+        status: ReadingSessionStatus.awaitingNextRepetition,
+        currentRepetition: 2,
+        totalRepetitions: 2,
+        generation: 2,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1회 낭독 완료'), findsOneWidget);
+    expect(find.text('2/2회를 이어서 낭독할까요?'), findsOneWidget);
+    expect(repository.continueCallCount, 0);
+
+    await tester.tap(
+      find.byKey(const Key('reading-repetition-continue-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.continueCallCount, 1);
+    expect(repository.state?.status, ReadingSessionStatus.running);
+    expect(find.text('1회 낭독 완료'), findsNothing);
+    expect(find.bySemanticsLabel('현재 어절, 오늘'), findsOneWidget);
+  });
+
+  testWidgets('회차 완료에서 그만하기는 세션을 종료하고 목록으로 돌아간다', (tester) async {
+    final repository = _ReadingRepository(
+      _state(currentWordIndex: 3, totalRepetitions: 3),
+    );
+    await _pumpView(tester, repository);
+
+    repository.emit(
+      _state(
+        status: ReadingSessionStatus.awaitingNextRepetition,
+        currentRepetition: 2,
+        totalRepetitions: 3,
+        generation: 2,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('reading-repetition-stop-button')));
+    await tester.pumpAndSettle();
+
+    expect(repository.continueCallCount, 0);
+    expect(repository.leaveCallCount, 1);
+    expect(repository.state?.status, ReadingSessionStatus.exited);
+  });
+
   testWidgets('최종 STT 완료 상태는 늦은 실행 상태를 무시하고 목록 복귀를 제공한다', (tester) async {
     final repository = _ReadingRepository(_state(currentWordIndex: 3));
     await _pumpView(tester, repository);
@@ -275,6 +329,7 @@ final class _ReadingRepository implements ReadingSessionRepository {
       StreamController<ReadingSessionState>.broadcast(sync: true);
   ReadingSessionState _state;
   int moveBackCallCount = 0;
+  int continueCallCount = 0;
   int leaveCallCount = 0;
   bool _disposed = false;
 
@@ -309,9 +364,23 @@ final class _ReadingRepository implements ReadingSessionRepository {
   }
 
   @override
+  Future<void> continueNextRepetition() async {
+    if (_disposed ||
+        _state.status != ReadingSessionStatus.awaitingNextRepetition) {
+      return;
+    }
+    continueCallCount++;
+    _state = _copyState(_state, status: ReadingSessionStatus.running);
+    _controller.add(_state);
+  }
+
+  @override
   Future<void> leave() async {
     if (_disposed) return;
-    if (_state.status != ReadingSessionStatus.running) return;
+    if (_state.status == ReadingSessionStatus.completed ||
+        _state.status == ReadingSessionStatus.exited) {
+      return;
+    }
     leaveCallCount++;
     _state = _copyState(
       _state,

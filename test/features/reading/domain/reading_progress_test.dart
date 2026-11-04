@@ -194,6 +194,19 @@ void main() {
       expect(completed.repetitionCompleted, isTrue);
     });
 
+    test('마지막 어절이 없는 final은 회차를 조기 완료하지 않는다', () {
+      final progress = createProgress();
+
+      final update = progress.acceptTranscript(
+        '오늘 아침에는 창문을 열고 바깥 공기를 천천히',
+        TranscriptKind.finalResult,
+      );
+
+      expect(update.cursor, 7);
+      expect(update.repetitionCompleted, isFalse);
+      expect(progress.isComplete, isFalse);
+    });
+
     test('반복 경계에서 전사 상태와 커서를 초기화한다', () {
       final progress = createProgress();
       progress.acceptTranscript(script, TranscriptKind.finalResult);

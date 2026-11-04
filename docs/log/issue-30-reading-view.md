@@ -86,3 +86,52 @@ Repository 테스트는 완료·나가기에서 상태와 generation을 먼저 �
 중단한 뒤 네이티브 `cancel`과 Dart 구독 취소를 수행하는 순서를 검증한다.
 네이티브 취소 완료 전에 이전 generation의 STT 이벤트를 보내도 커서·회차·완료
 상태가 바뀌지 않으며, 완료 뒤 timer tick도 최종 경과 시간을 바꾸지 않는다.
+
+## 2026-11-04 실기기 피드백 후속 수정
+
+- iPhone 15 Pro에서는 음성에 따른 어절 진행, 반복, 완료까지 정상 동작했다.
+- Android SM-F776N에서는 음성 최종 결과로 세션 완료는 됐지만 낭독 중 partial
+  결과가 오지 않아 현재 어절이 첫 위치에 머물렀다. API 33+ segmented session을
+  요청하고 `onSegmentResults`를 확정 전사 이벤트로 전달하도록 보강했다. 해당
+  기능을 지원하지 않는 인식기는 기존 partial/final 결과 경로를 유지한다.
+- 회차 경계에서는 다음 generation을 즉시 시작하지 않고 STT를 취소한 뒤
+  `다음 회차 대기` 상태가 된다. 중앙 확인창의 `이어하기`를 선택해야 다음 STT를
+  시작하며, `그만하기`는 generation을 무효화하고 세션 자원을 정리한다.
+- Flutter Cupertino 테마, iOS `UIUserInterfaceStyle`, Android launch/normal theme와
+  force-dark 설정을 모두 라이트 모드로 고정했다.
+- Xcode 27.2에서 `AVAudioConverter` 입력 블록을 인라인으로 전달할 때 발생한 Swift
+  컴파일러 내부 오류는 같은 블록을 명시적인 지역 변수로 분리해 우회했다. Xcode
+  27.2 Simulator 빌드와 iPhone Profile 빌드·설치에 성공했다.
+- 수정 빌드를 두 실기기에 다시 설치했다. Android segmented 결과의 실제 포인터
+  진행과 회차 확인창의 양 플랫폼 동작은 재검증 대기 중이다.
+- Android R3에서 시도한 2.5초 강제 `stopListening`은 `NO_MATCH` 반복 뒤
+  `BUSY` 오류를 만들어 제거했다. 제품 동작으로 사용하지 않는다.
+- R5의 임시 `다음 어절` 버튼은 ViewModel의 복사 상태만 변경해, 1초 timer가
+  Repository의 실제 커서 0을 다시 발행할 때 첫 어절로 되돌아갔다. 이 현상은
+  제품 렌더링 결함이 아니라 진단 경로의 상태 원본 불일치였다.
+- R6에서는 임시 버튼도 Repository와 Reducer의 단일 상태 원본을 변경하고,
+  generation을 교체해 이전 STT 결과를 무효화하도록 수정했다. timer 갱신 뒤에도
+  전진한 커서가 유지되는 Repository 회귀 테스트를 추가했다.
+- R6 로그에서 수동 전진·후퇴 경로는 정상이나 음성 전진은 네이티브 `ready` 뒤
+  `partial`·`result` 없이 종료됐다. `onSegmentResults` 수신 코드는 있었지만
+  요청 Intent에 `EXTRA_SEGMENTED_SESSION`이 빠져 실제 엔진은 단발
+  `AMBIENT_ONESHOT` 모드로 실행되고 있었다. R7은 API 33+에서 1초 완전 침묵을
+  구간 경계로 지정해 segmented session을 실제 요청한다.
+- R7 실기기 재검증에서도 Google SODA는 segmented 요청을 무시하고
+  `AMBIENT_ONESHOT`으로 실행됐다. `ready` 뒤 정확히 5초마다
+  `MIC_END_OF_DATA`와 `ERROR_NO_MATCH(7)`가 반복됐고, 사용자의 발화는 일부
+  generation에서 세션 종료 직후 `speech-begin`으로만 관찰됐다. 따라서 Dart
+  브리지나 매칭이 아니라 시스템 인식기가 소유한 마이크 세션의 조기 종료가
+  음성 추적을 막는 원인으로 좁혀졌다.
+- R8은 API 33+ 공식 `EXTRA_AUDIO_SOURCE` 계약을 사용한다. 앱의 `AudioRecord`가
+  16kHz·mono·PCM16 마이크 버퍼를 메모리 파이프로 온디바이스
+  `SpeechRecognizer`에 공급하고, segmented session의 수명을 파이프 종료와
+  결합한다. 버퍼를 파일로 저장하거나 Dart·네트워크로 전달하지 않으며,
+  취소·완료·오류에서 마이크와 양쪽 파일 디스크립터를 함께 정리한다.
+- SM-F776N 재검증에서 SODA가 `AMBIENT_CONTINUOUS`로 시작했고 같은 generation이
+  40초 이상 유지됐다. `partial` 4회와 `segment` 1회를 받은 뒤 실제 낭독 화면의
+  포인터가 사용자가 확인한 `책상을` 어절까지 전진했다. 홈 전환 직후
+  `audio-source=close`를 확인해 백그라운드 마이크도 남지 않았다. 실기기 증거를
+  확보한 뒤 임시 다음 어절 버튼, 진단 앱 이름, 초당 마이크 레벨 로그는 제거했다.
+
+Android 공식 계약: <https://developer.android.com/reference/android/speech/RecognizerIntent#EXTRA_AUDIO_SOURCE>

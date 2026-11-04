@@ -75,6 +75,7 @@ final class CursorMatcher {
       final start = anchor + skipped;
       if (start >= tokens.length) break;
       final candidate = _alignFrom(start, skipped, hypothesisUnits);
+      if (candidate == null) continue;
       final candidateScore =
           candidate.normalizedDistance +
           (skipped == 0 ? 0 : policy.skipPenalty);
@@ -91,7 +92,7 @@ final class CursorMatcher {
         : null;
   }
 
-  CursorMatch _alignFrom(int start, int skipped, List<int> hypothesis) {
+  CursorMatch? _alignFrom(int start, int skipped, List<int> hypothesis) {
     final unitBudget = (hypothesis.length * policy.lookaheadRatio).floor();
     final scriptUnits = <int>[];
     final boundaries = <({int cursor, int unitEnd})>[];
@@ -107,6 +108,10 @@ final class CursorMatcher {
     final distances = _lastEditDistanceRow(hypothesis, scriptUnits);
     CursorMatch? best;
     for (final boundary in boundaries) {
+      if (boundary.cursor == tokens.length &&
+          !_hasTrailingTokenEvidence(hypothesis)) {
+        continue;
+      }
       final distance = distances[boundary.unitEnd];
       final normalized =
           distance /
@@ -122,7 +127,29 @@ final class CursorMatcher {
         );
       }
     }
-    return best!;
+    return best;
+  }
+
+  /// 전체 정렬의 삭제 오차만으로 마지막 어절까지 완료되는 것을 막는다.
+  /// 마지막 어절과 유사한 발화가 전사 끝에 실제로 있어야 완료 후보를 만든다.
+  bool _hasTrailingTokenEvidence(List<int> hypothesis) {
+    final target = tokens.last.units;
+    final maxEdits = (target.length * policy.maxNormalizedDistance).floor();
+    final minimumLength = target.length - maxEdits;
+    final maximumLength = target.length + maxEdits;
+    for (
+      var suffixLength = minimumLength < 1 ? 1 : minimumLength;
+      suffixLength <= maximumLength && suffixLength <= hypothesis.length;
+      suffixLength++
+    ) {
+      final suffix = hypothesis.sublist(hypothesis.length - suffixLength);
+      final distance = _lastEditDistanceRow(suffix, target).last;
+      final denominator = suffixLength > target.length
+          ? suffixLength
+          : target.length;
+      if (distance / denominator <= policy.maxNormalizedDistance) return true;
+    }
+    return false;
   }
 
   static List<int> _lastEditDistanceRow(List<int> source, List<int> target) {

@@ -38,6 +38,7 @@ final class _MalttoAppState extends State<MalttoApp> {
       debugShowCheckedModeBanner: false,
       title: '말또',
       theme: const CupertinoThemeData(
+        brightness: Brightness.light,
         primaryColor: CupertinoColors.systemBlue,
         scaffoldBackgroundColor: CupertinoColors.systemBackground,
       ),

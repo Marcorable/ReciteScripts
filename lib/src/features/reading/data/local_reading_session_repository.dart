@@ -50,7 +50,8 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
   }) async {
     _ensureActive();
     if (_isStarting) throw StateError('낭독 세션을 시작하고 있습니다.');
-    if (_reducer?.state.status == ReadingSessionStatus.running) {
+    if (_reducer?.state.status == ReadingSessionStatus.running ||
+        _reducer?.state.status == ReadingSessionStatus.awaitingNextRepetition) {
       throw StateError('이미 실행 중인 낭독 세션이 있습니다.');
     }
     _isStarting = true;
@@ -98,7 +99,6 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
   void _handleSttEvent(SttEvent event) {
     final reducer = _reducer;
     if (reducer == null) return;
-
     if (event.kind == SttEventKind.ended ||
         (event.kind == SttEventKind.failure && event.retryable == true)) {
       _restartRecognition(reducer, event);
@@ -143,15 +143,7 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
     _emit();
     if (transition == ReadingSessionTransition.repetitionCompleted) {
       final nextState = reducer.state;
-      _enqueueResourceOperation(() async {
-        await _sttService.cancel(nextState.sessionId);
-        final current = _reducer?.state;
-        if (current?.status != ReadingSessionStatus.running ||
-            current?.generation != nextState.generation) {
-          return;
-        }
-        await _sttService.start(_requestFor(nextState));
-      });
+      _enqueueResourceOperation(() => _sttService.cancel(nextState.sessionId));
     } else if (transition == ReadingSessionTransition.sessionCompleted) {
       _stopTimer();
       final completedState = reducer.state;
@@ -202,6 +194,25 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
     _emit();
     _enqueueResourceOperation(() async {
       await _sttService.cancel(nextState.sessionId);
+      final current = _reducer?.state;
+      if (current?.status != ReadingSessionStatus.running ||
+          current?.generation != nextState.generation) {
+        return;
+      }
+      await _sttService.start(_requestFor(nextState));
+    });
+  }
+
+  @override
+  Future<void> continueNextRepetition() async {
+    final reducer = _reducer;
+    if (reducer == null) return;
+    final transition = reducer.continueNextRepetition();
+    if (transition == ReadingSessionTransition.ignored) return;
+
+    final nextState = reducer.state;
+    _emit();
+    _enqueueResourceOperation(() async {
       final current = _reducer?.state;
       if (current?.status != ReadingSessionStatus.running ||
           current?.generation != nextState.generation) {

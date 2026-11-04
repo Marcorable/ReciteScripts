@@ -91,7 +91,16 @@ final class ReadingSessionReducer {
     _generation++;
     _lastSequence = -1;
     _progress.resetForNextRepetition();
+    _status = ReadingSessionStatus.awaitingNextRepetition;
     return ReadingSessionTransition.repetitionCompleted;
+  }
+
+  ReadingSessionTransition continueNextRepetition() {
+    if (_status != ReadingSessionStatus.awaitingNextRepetition) {
+      return ReadingSessionTransition.ignored;
+    }
+    _status = ReadingSessionStatus.running;
+    return ReadingSessionTransition.nextRepetitionStarted;
   }
 
   ReadingSessionTransition updateElapsed(Duration elapsed) {
@@ -147,7 +156,8 @@ final class ReadingSessionReducer {
   }
 
   ReadingSessionTransition exit() {
-    if (_status != ReadingSessionStatus.running) {
+    if (_status == ReadingSessionStatus.completed ||
+        _status == ReadingSessionStatus.exited) {
       return ReadingSessionTransition.ignored;
     }
     _status = ReadingSessionStatus.exited;

@@ -67,7 +67,7 @@ void main() {
     expect(repository.state?.elapsed, const Duration(seconds: 3));
   });
 
-  test('회차 경계에서 이전 작업을 취소한 뒤 새 generation을 시작한다', () async {
+  test('회차 경계에서 이전 작업을 취소하고 이어하기 전까지 새 generation을 대기한다', () async {
     await repository.start(script: _script, repetitions: 2);
 
     sttService.emit(
@@ -84,7 +84,11 @@ void main() {
     expect(repository.state?.currentRepetition, 2);
     expect(repository.state?.currentWord, '아침에는');
     expect(repository.state?.generation, 2);
-    expect(sttService.startedGenerations, [1, 2]);
+    expect(
+      repository.state?.status,
+      ReadingSessionStatus.awaitingNextRepetition,
+    );
+    expect(sttService.startedGenerations, [1]);
     expect(sttService.cancelledSessionIds, ['reading-1']);
 
     sttService.emit(
@@ -107,12 +111,50 @@ void main() {
         text: _body,
       ),
     );
+    expect(repository.state?.currentWordIndex, 0);
+
+    await repository.continueNextRepetition();
+    await pumpEventQueue(times: 10);
+
+    expect(repository.state?.status, ReadingSessionStatus.running);
+    expect(sttService.startedGenerations, [1, 2]);
+
+    sttService.emit(
+      const SttEvent(
+        sessionId: 'reading-1',
+        generation: 2,
+        sequence: 2,
+        kind: SttEventKind.partial,
+        text: _body,
+      ),
+    );
     await pumpEventQueue(times: 10);
 
     expect(repository.state?.status, ReadingSessionStatus.completed);
     expect(sttService.startedGenerations, [1, 2]);
     expect(sttService.cancelledSessionIds, ['reading-1', 'reading-1']);
     expect(sttService.subscriptionCancelCount, 1);
+  });
+
+  test('회차 대기 중 그만하기는 새 STT를 시작하지 않고 자원을 정리한다', () async {
+    await repository.start(script: _script, repetitions: 2);
+    sttService.emit(
+      const SttEvent(
+        sessionId: 'reading-1',
+        generation: 1,
+        sequence: 1,
+        kind: SttEventKind.finalResult,
+        text: _body,
+      ),
+    );
+    await pumpEventQueue(times: 10);
+
+    await repository.leave();
+
+    expect(repository.state?.status, ReadingSessionStatus.exited);
+    expect(sttService.startedGenerations, [1]);
+    expect(sttService.subscriptionCancelCount, 1);
+    expect(timerFactory.timer.isActive, isFalse);
   });
 
   test('한 어절 뒤로는 이전 STT를 취소하고 새 generation에서 재시작한다', () async {

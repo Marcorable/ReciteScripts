@@ -168,26 +168,33 @@ internal class AndroidSpeechAdapter(
                 NativeSttModelStatus.UNSUPPORTED ->
                     throw FlutterError("localeUnsupported", "The locale is unsupported.")
             }
-            val handle = PlatformSpeechRecognizerHandle(
-                createOnDeviceRecognizer(),
-                recognitionIntent(request.locale),
-            )
-            ensurePending(reservation)
-            val session = AndroidSpeechSession(
-                sessionId = request.sessionId,
-                generation = request.generation,
-                recognizer = handle,
-                eventHandler = ::sendEvent,
-                finishedHandler = ::sessionDidFinish,
-            )
-            activeSession = session
-            pendingStart = null
+            val audioSource = AndroidRecognitionAudioSource.create()
             try {
-                session.start()
+                val handle = PlatformSpeechRecognizerHandle(
+                    createOnDeviceRecognizer(),
+                    recognitionIntent(request.locale, audioSource),
+                )
+                ensurePending(reservation)
+                val session = AndroidSpeechSession(
+                    sessionId = request.sessionId,
+                    generation = request.generation,
+                    recognizer = handle,
+                    audioSource = audioSource,
+                    eventHandler = ::sendEvent,
+                    finishedHandler = ::sessionDidFinish,
+                )
+                activeSession = session
+                pendingStart = null
+                try {
+                    session.start()
+                } catch (error: Throwable) {
+                    session.destroy()
+                    if (activeSession === session) activeSession = null
+                    throw FlutterError("unknown", "The STT session could not start.")
+                }
             } catch (error: Throwable) {
-                session.destroy()
-                if (activeSession === session) activeSession = null
-                throw FlutterError("unknown", "The STT session could not start.")
+                audioSource.close()
+                throw error
             }
         } finally {
             if (pendingStart == reservation) pendingStart = null
@@ -378,7 +385,10 @@ internal class AndroidSpeechAdapter(
             )
         }
 
-    private fun recognitionIntent(locale: String) =
+    private fun recognitionIntent(
+        locale: String,
+        audioSource: RecognitionAudioSource? = null,
+    ) =
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
@@ -391,6 +401,7 @@ internal class AndroidSpeechAdapter(
                     RecognizerIntent.FORMATTING_OPTIMIZE_LATENCY,
                 )
                 putExtra(RecognizerIntent.EXTRA_HIDE_PARTIAL_TRAILING_PUNCTUATION, true)
+                audioSource?.configure(this)
             }
         }
 

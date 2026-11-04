@@ -1,4 +1,4 @@
-enum ReadingSessionStatus { running, completed, exited }
+enum ReadingSessionStatus { running, awaitingNextRepetition, completed, exited }
 
 final class ReadingSessionState {
   const ReadingSessionState({
@@ -36,6 +36,7 @@ enum ReadingSessionTransition {
   ignored,
   progressed,
   movedBack,
+  nextRepetitionStarted,
   recognitionRestarted,
   repetitionCompleted,
   sessionCompleted,

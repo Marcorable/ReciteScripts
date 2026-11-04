@@ -39,6 +39,7 @@ internal class AndroidSpeechSession(
     val sessionId: String,
     val generation: Long,
     private val recognizer: SpeechRecognizerHandle,
+    private val audioSource: RecognitionAudioSource? = null,
     private val eventHandler: (NativeSttEvent) -> Unit,
     private val finishedHandler: (AndroidSpeechSession) -> Unit,
 ) : RecognitionListener {
@@ -53,6 +54,7 @@ internal class AndroidSpeechSession(
     fun start() {
         check(acceptsEvents)
         recognizer.startListening()
+        audioSource?.start()
     }
 
     fun matches(event: NativeSttEvent): Boolean =
@@ -105,10 +107,26 @@ internal class AndroidSpeechSession(
         finishWithResult(resultText(results))
     }
 
+    override fun onSegmentResults(segmentResults: Bundle) {
+        emitSegmentForTest(resultText(segmentResults))
+    }
+
+    override fun onEndOfSegmentedSession() {
+        if (!acceptsEvents) return
+        acceptsEvents = false
+        emitUnchecked(NativeSttEventKind.ENDED)
+        cleanUp()
+        finishedHandler(this)
+    }
+
     override fun onEvent(eventType: Int, params: Bundle?) = Unit
 
     internal fun emitPartialForTest(text: String?) {
         emitText(NativeSttEventKind.PARTIAL, text)
+    }
+
+    internal fun emitSegmentForTest(text: String?) {
+        emitText(NativeSttEventKind.FINAL_RESULT, text)
     }
 
     internal fun finishWithResult(text: String?) {
@@ -173,6 +191,7 @@ internal class AndroidSpeechSession(
     private fun cleanUp() {
         if (destroyed) return
         destroyed = true
+        audioSource?.close()
         recognizer.setRecognitionListener(null)
         recognizer.destroy()
     }
