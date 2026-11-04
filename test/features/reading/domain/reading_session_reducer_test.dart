@@ -146,7 +146,7 @@ void main() {
       expect(reducer.state.generation, 2);
     });
 
-    test('한 어절 뒤로는 커서 하나와 generation만 교체하고 첫 어절에서 멈춘다', () {
+    test('한 어절 뒤로는 커서 하나와 generation만 교체하고 첫 어절의 후속 전사를 받는다', () {
       final reducer = createReducer();
       reducer.acceptTranscript(
         sessionId: 'session-1',
@@ -168,6 +168,17 @@ void main() {
       expect(reducer.moveBackOneWord(), ReadingSessionTransition.ignored);
       expect(reducer.state.currentWordIndex, 0);
       expect(reducer.state.generation, generationAtStart);
+
+      expect(
+        reducer.acceptTranscript(
+          sessionId: 'session-1',
+          generation: generationAtStart,
+          sequence: 1,
+          text: script,
+          kind: TranscriptKind.finalResult,
+        ),
+        ReadingSessionTransition.sessionCompleted,
+      );
     });
 
     test('후퇴 전 generation의 늦은 결과는 무시하고 새 구간에서 진행한다', () {

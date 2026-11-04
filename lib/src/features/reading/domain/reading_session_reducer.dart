@@ -112,7 +112,7 @@ final class ReadingSessionReducer {
   }
 
   ReadingSessionTransition moveBackOneWord() {
-    if (_status != ReadingSessionStatus.running) {
+    if (_status != ReadingSessionStatus.running || _progress.cursor == 0) {
       return ReadingSessionTransition.ignored;
     }
     final update = _progress.moveBackOneWord();

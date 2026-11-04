@@ -190,7 +190,7 @@ void main() {
     expect(repository.state?.currentWordIndex, 2);
   });
 
-  test('첫 어절에서 뒤로는 STT를 취소하거나 재시작하지 않는다', () async {
+  test('첫 어절에서 뒤로는 STT를 재시작하지 않고 후속 전사를 반영한다', () async {
     await repository.start(script: _script, repetitions: 1);
 
     await repository.moveBackOneWord();
@@ -200,6 +200,19 @@ void main() {
     expect(repository.state?.generation, 1);
     expect(sttService.cancelledSessionIds, isEmpty);
     expect(sttService.startedGenerations, [1]);
+
+    sttService.emit(
+      const SttEvent(
+        sessionId: 'reading-1',
+        generation: 1,
+        sequence: 1,
+        kind: SttEventKind.finalResult,
+        text: _body,
+      ),
+    );
+    await pumpEventQueue(times: 10);
+
+    expect(repository.state?.status, ReadingSessionStatus.completed);
   });
 
   test('회차 도중 ended 이벤트는 진행 상태를 유지하고 인식을 재시작한다', () async {
