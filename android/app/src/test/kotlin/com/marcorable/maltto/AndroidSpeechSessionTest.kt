@@ -94,6 +94,25 @@ class AndroidSpeechSessionTest {
     }
 
     @Test
+    fun `audio source failure emits retryable audio failure and releases resources`() {
+        val recognizer = FakeSpeechRecognizerHandle()
+        val audioSource = FakeRecognitionAudioSource()
+        val events = mutableListOf<NativeSttEvent>()
+        val session = session(recognizer, events, audioSource)
+
+        session.start()
+        audioSource.fail()
+        audioSource.fail()
+
+        assertEquals(listOf(NativeSttEventKind.FAILURE), events.map { it.kind })
+        assertEquals(NativeSttFailureCode.AUDIO, events.single().failureCode)
+        assertEquals(true, events.single().retryable)
+        assertTrue(recognizer.cancelled)
+        assertTrue(recognizer.destroyed)
+        assertEquals(1, audioSource.closeCount)
+    }
+
+    @Test
     fun `empty final and recognition error become structured failures`() {
         val emptyEvents = mutableListOf<NativeSttEvent>()
         session(FakeSpeechRecognizerHandle(), emptyEvents).finishWithResult("   ")
@@ -132,11 +151,17 @@ class AndroidSpeechSessionTest {
 private class FakeRecognitionAudioSource : RecognitionAudioSource {
     var started = false
     var closeCount = 0
+    private var failureHandler: (() -> Unit)? = null
 
     override fun configure(intent: Intent) = Unit
 
-    override fun start() {
+    override fun start(onFailure: () -> Unit) {
         started = true
+        failureHandler = onFailure
+    }
+
+    fun fail() {
+        failureHandler?.invoke()
     }
 
     override fun close() {

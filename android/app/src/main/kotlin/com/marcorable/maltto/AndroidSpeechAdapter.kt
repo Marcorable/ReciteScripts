@@ -40,6 +40,7 @@ internal class AndroidSpeechAdapter(
     private var activeSession: AndroidSpeechSession? = null
     private var pendingStart: StartReservation? = null
     private val modelStatusCache = mutableMapOf<String, NativeSttModelStatus>()
+    private val audioSourceSupportCache = mutableMapOf<String, Boolean>()
     private val supportRecognizers = mutableSetOf<SpeechRecognizer>()
     private val modelDownloadRecognizers = mutableMapOf<String, SpeechRecognizer>()
     private var disposed = false
@@ -168,7 +169,12 @@ internal class AndroidSpeechAdapter(
                 NativeSttModelStatus.UNSUPPORTED ->
                     throw FlutterError("localeUnsupported", "The locale is unsupported.")
             }
-            val audioSource = AndroidRecognitionAudioSource.create()
+            val audioSource =
+                if (supportsAudioSource(request.locale)) {
+                    AndroidRecognitionAudioSource.create()
+                } else {
+                    null
+                }
             try {
                 val handle = PlatformSpeechRecognizerHandle(
                     createOnDeviceRecognizer(),
@@ -193,7 +199,7 @@ internal class AndroidSpeechAdapter(
                     throw FlutterError("unknown", "The STT session could not start.")
                 }
             } catch (error: Throwable) {
-                audioSource.close()
+                audioSource?.close()
                 throw error
             }
         } finally {
@@ -220,6 +226,7 @@ internal class AndroidSpeechAdapter(
         destroySupportRecognizers()
         destroyModelDownloadRecognizers()
         modelStatusCache.clear()
+        audioSourceSupportCache.clear()
         eventScope.cancel()
     }
 
@@ -246,6 +253,7 @@ internal class AndroidSpeechAdapter(
         destroySupportRecognizers()
         destroyModelDownloadRecognizers()
         modelStatusCache.clear()
+        audioSourceSupportCache.clear()
         eventScope.cancel()
     }
 
@@ -256,6 +264,57 @@ internal class AndroidSpeechAdapter(
             if (AndroidSttPolicy.modelStatusCompletesDownloadRequest(status)) {
                 releaseModelDownloadRecognizer(localeKey)
             }
+        }
+
+    private suspend fun supportsAudioSource(locale: String): Boolean {
+        val key = localeKey(locale)
+        audioSourceSupportCache[key]?.let { return it }
+        val probe = RecognitionAudioSourceSupportProbe.create()
+        val supported = try {
+            queryIntentSupport(recognitionIntent(locale, probe))
+        } finally {
+            probe.close()
+        }
+        audioSourceSupportCache[key] = supported
+        return supported
+    }
+
+    private suspend fun queryIntentSupport(intent: Intent): Boolean =
+        try {
+            withTimeout(SUPPORT_CHECK_TIMEOUT_MILLIS) {
+                suspendCancellableCoroutine { continuation ->
+                    ensureActiveAndMainThread()
+                    val recognizer = createOnDeviceRecognizer()
+                    supportRecognizers += recognizer
+                    continuation.invokeOnCancellation {
+                        activity.runOnUiThread { releaseSupportRecognizer(recognizer) }
+                    }
+                    try {
+                        recognizer.checkRecognitionSupport(
+                            intent,
+                            activity.mainExecutor,
+                            object : RecognitionSupportCallback {
+                                override fun onSupportResult(
+                                    recognitionSupport: RecognitionSupport,
+                                ) {
+                                    releaseSupportRecognizer(recognizer)
+                                    if (continuation.isActive) continuation.resume(true)
+                                }
+
+                                override fun onError(error: Int) {
+                                    releaseSupportRecognizer(recognizer)
+                                    if (continuation.isActive) continuation.resume(false)
+                                }
+                            },
+                        )
+                    } catch (_: Throwable) {
+                        releaseSupportRecognizer(recognizer)
+                        if (continuation.isActive) continuation.resume(false)
+                    }
+                }
+            }
+        } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+            false
         }
 
     private fun triggerModelDownload(
@@ -387,7 +446,7 @@ internal class AndroidSpeechAdapter(
 
     private fun recognitionIntent(
         locale: String,
-        audioSource: RecognitionAudioSource? = null,
+        audioSource: RecognitionAudioSourceConfiguration? = null,
     ) =
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)

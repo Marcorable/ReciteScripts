@@ -54,7 +54,7 @@ internal class AndroidSpeechSession(
     fun start() {
         check(acceptsEvents)
         recognizer.startListening()
-        audioSource?.start()
+        audioSource?.start(::onAudioSourceFailure)
     }
 
     fun matches(event: NativeSttEvent): Boolean =
@@ -145,6 +145,22 @@ internal class AndroidSpeechSession(
         }
         cleanUp()
         finishedHandler(this)
+    }
+
+    private fun onAudioSourceFailure() {
+        if (!acceptsEvents) return
+        acceptsEvents = false
+        runCatching { recognizer.cancel() }
+        try {
+            emitUnchecked(
+                NativeSttEventKind.FAILURE,
+                failureCode = NativeSttFailureCode.AUDIO,
+                retryable = true,
+            )
+        } finally {
+            cleanUp()
+            finishedHandler(this)
+        }
     }
 
     private fun resultText(results: Bundle?): String? =

@@ -4,6 +4,8 @@ import android.content.Intent
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.speech.RecognizerIntent
 import android.util.Log
@@ -12,10 +14,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.math.max
 
-internal interface RecognitionAudioSource {
+internal interface RecognitionAudioSourceConfiguration {
     fun configure(intent: Intent)
+}
 
-    fun start()
+internal interface RecognitionAudioSource : RecognitionAudioSourceConfiguration {
+    fun start(onFailure: () -> Unit)
 
     fun close()
 }
@@ -25,27 +29,23 @@ internal class AndroidRecognitionAudioSource private constructor(
     private val recognizerDescriptor: ParcelFileDescriptor,
     private val writerDescriptor: ParcelFileDescriptor,
     private val bufferSize: Int,
+    private val mainHandler: Handler,
 ) : RecognitionAudioSource {
     private val started = AtomicBoolean(false)
     private val closed = AtomicBoolean(false)
     private var writerThread: Thread? = null
+    private var failureHandler: (() -> Unit)? = null
 
     override fun configure(intent: Intent) {
         check(!closed.get())
-        intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, recognizerDescriptor)
-        intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, CHANNEL_COUNT)
-        intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, ENCODING)
-        intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, SAMPLE_RATE_HZ)
-        intent.putExtra(
-            RecognizerIntent.EXTRA_SEGMENTED_SESSION,
-            RecognizerIntent.EXTRA_AUDIO_SOURCE,
-        )
+        configureRecognitionAudioSource(intent, recognizerDescriptor)
     }
 
-    override fun start() {
+    override fun start(onFailure: () -> Unit) {
         check(!closed.get())
         if (!started.compareAndSet(false, true)) return
 
+        failureHandler = onFailure
         audioRecord.startRecording()
         check(audioRecord.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
             "Microphone recording did not start."
@@ -79,15 +79,22 @@ internal class AndroidRecognitionAudioSource private constructor(
                     )
                     when {
                         count > 0 -> output.write(buffer, 0, count)
-                        count == AudioRecord.ERROR_DEAD_OBJECT -> return
+                        count == AudioRecord.ERROR_DEAD_OBJECT ->
+                            throw IOException("AudioRecord became unavailable.")
                         count < 0 -> throw IOException("AudioRecord read failed with $count")
                     }
                 }
             }
         } catch (error: IOException) {
-            if (!closed.get()) {
-                Log.w(DIAGNOSTIC_TAG, "microphone stream ended unexpectedly", error)
-            }
+            reportFailure(error)
+        }
+    }
+
+    private fun reportFailure(error: IOException) {
+        if (closed.get()) return
+        Log.w(DIAGNOSTIC_TAG, "microphone stream ended unexpectedly", error)
+        mainHandler.post {
+            if (!closed.get()) failureHandler?.invoke()
         }
     }
 
@@ -132,6 +139,7 @@ internal class AndroidRecognitionAudioSource private constructor(
                     recognizerDescriptor = descriptors[0],
                     writerDescriptor = descriptors[1],
                     bufferSize = bufferSize,
+                    mainHandler = Handler(Looper.getMainLooper()),
                 )
             } catch (error: Throwable) {
                 audioRecord.release()
@@ -139,4 +147,45 @@ internal class AndroidRecognitionAudioSource private constructor(
             }
         }
     }
+}
+
+internal class RecognitionAudioSourceSupportProbe private constructor(
+    private val recognizerDescriptor: ParcelFileDescriptor,
+    private val writerDescriptor: ParcelFileDescriptor,
+) : RecognitionAudioSourceConfiguration, AutoCloseable {
+    override fun configure(intent: Intent) {
+        configureRecognitionAudioSource(intent, recognizerDescriptor)
+    }
+
+    override fun close() {
+        runCatching { writerDescriptor.close() }
+        runCatching { recognizerDescriptor.close() }
+    }
+
+    companion object {
+        fun create(): RecognitionAudioSourceSupportProbe {
+            val descriptors = ParcelFileDescriptor.createPipe()
+            return RecognitionAudioSourceSupportProbe(
+                recognizerDescriptor = descriptors[0],
+                writerDescriptor = descriptors[1],
+            )
+        }
+    }
+}
+
+private fun configureRecognitionAudioSource(
+    intent: Intent,
+    descriptor: ParcelFileDescriptor,
+) {
+    intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, descriptor)
+    intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)
+    intent.putExtra(
+        RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING,
+        AudioFormat.ENCODING_PCM_16BIT,
+    )
+    intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, 16_000)
+    intent.putExtra(
+        RecognizerIntent.EXTRA_SEGMENTED_SESSION,
+        RecognizerIntent.EXTRA_AUDIO_SOURCE,
+    )
 }
