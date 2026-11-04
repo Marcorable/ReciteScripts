@@ -108,13 +108,25 @@ class AndroidSpeechAdapterInstrumentedTest {
             lateinit var session: AndroidSpeechSession
             awaitAdapterCall {
                 val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(activity)
+                val audioSource = AndroidRecognitionAudioSource.create()
                 session = AndroidSpeechSession(
                     sessionId = "live-instrumented-session",
                     generation = 1,
                     recognizer = PlatformSpeechRecognizerHandle(
                         recognizer,
-                        liveRecognitionIntent(),
+                        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(
+                                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+                            )
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, TEST_LOCALE)
+                            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                            audioSource.configure(this)
+                        },
                     ),
+                    audioSource = audioSource,
                     eventHandler = events::offer,
                     finishedHandler = {},
                 )
@@ -162,15 +174,6 @@ class AndroidSpeechAdapterInstrumentedTest {
             withTimeout(20_000) { result.await().getOrThrow() }
         }
     }
-
-    private fun liveRecognitionIntent() =
-        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, TEST_LOCALE)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        }
 
     private companion object {
         const val TEST_LOCALE = "ko-KR"

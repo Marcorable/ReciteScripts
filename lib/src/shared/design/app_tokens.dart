@@ -17,3 +17,14 @@ abstract final class AppTargets {
     minHeight: preferred,
   );
 }
+
+abstract final class AppRadii {
+  static const BorderRadius pill = BorderRadius.all(Radius.circular(999));
+  static const BorderRadius medium = BorderRadius.all(Radius.circular(12));
+}
+
+abstract final class AppMotion {
+  static const Duration none = Duration.zero;
+  static const Duration standard = Duration(milliseconds: 200);
+  static const Duration scroll = Duration(milliseconds: 250);
+}

@@ -71,7 +71,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(readingRepository.startedRepetitions, 3);
-    expect(find.text('1/3회'), findsOneWidget);
+    expect(find.text('1/3회 · 2회 남음'), findsOneWidget);
     expect(find.byKey(const Key('reading-repetition-status')), findsOneWidget);
   });
 
@@ -233,6 +233,7 @@ final class _ReadingRepository implements ReadingSessionRepository {
   int? startedRepetitions;
   int leaveCallCount = 0;
   ReadingSessionState? _state;
+  bool _disposed = false;
 
   @override
   ReadingSessionState? get state => _state;
@@ -259,6 +260,7 @@ final class _ReadingRepository implements ReadingSessionRepository {
       totalRepetitions: repetitions,
       currentWordIndex: 0,
       currentWord: '아침에는',
+      words: const ['아침에는', '창문을', '열고', '문장을', '읽는다'],
       totalWords: 5,
       elapsed: Duration.zero,
       generation: 1,
@@ -268,6 +270,7 @@ final class _ReadingRepository implements ReadingSessionRepository {
 
   @override
   Future<void> leave() async {
+    if (_disposed) return;
     leaveCallCount++;
     final current = _state;
     if (current == null || current.status != ReadingSessionStatus.running) {
@@ -281,6 +284,7 @@ final class _ReadingRepository implements ReadingSessionRepository {
       totalRepetitions: current.totalRepetitions,
       currentWordIndex: current.currentWordIndex,
       currentWord: current.currentWord,
+      words: current.words,
       totalWords: current.totalWords,
       elapsed: current.elapsed,
       generation: current.generation + 1,
@@ -289,5 +293,15 @@ final class _ReadingRepository implements ReadingSessionRepository {
   }
 
   @override
-  Future<void> dispose() => _controller.close();
+  Future<void> moveBackOneWord() async {}
+
+  @override
+  Future<void> continueNextRepetition() async {}
+
+  @override
+  Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
+    await _controller.close();
+  }
 }

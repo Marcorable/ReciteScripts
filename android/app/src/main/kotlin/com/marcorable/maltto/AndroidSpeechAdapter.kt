@@ -40,6 +40,7 @@ internal class AndroidSpeechAdapter(
     private var activeSession: AndroidSpeechSession? = null
     private var pendingStart: StartReservation? = null
     private val modelStatusCache = mutableMapOf<String, NativeSttModelStatus>()
+    private val audioSourceSupportedLocales = mutableSetOf<String>()
     private val supportRecognizers = mutableSetOf<SpeechRecognizer>()
     private val modelDownloadRecognizers = mutableMapOf<String, SpeechRecognizer>()
     private var disposed = false
@@ -168,26 +169,40 @@ internal class AndroidSpeechAdapter(
                 NativeSttModelStatus.UNSUPPORTED ->
                     throw FlutterError("localeUnsupported", "The locale is unsupported.")
             }
-            val handle = PlatformSpeechRecognizerHandle(
-                createOnDeviceRecognizer(),
-                recognitionIntent(request.locale),
-            )
+            val audioSourceSupported = supportsAudioSource(request.locale)
             ensurePending(reservation)
-            val session = AndroidSpeechSession(
-                sessionId = request.sessionId,
-                generation = request.generation,
-                recognizer = handle,
-                eventHandler = ::sendEvent,
-                finishedHandler = ::sessionDidFinish,
-            )
-            activeSession = session
-            pendingStart = null
+            val audioSource =
+                if (audioSourceSupported) {
+                    AndroidRecognitionAudioSource.create()
+                } else {
+                    null
+                }
             try {
-                session.start()
+                val handle = PlatformSpeechRecognizerHandle(
+                    createOnDeviceRecognizer(),
+                    recognitionIntent(request.locale, audioSource),
+                )
+                ensurePending(reservation)
+                val session = AndroidSpeechSession(
+                    sessionId = request.sessionId,
+                    generation = request.generation,
+                    recognizer = handle,
+                    audioSource = audioSource,
+                    eventHandler = ::sendEvent,
+                    finishedHandler = ::sessionDidFinish,
+                )
+                activeSession = session
+                pendingStart = null
+                try {
+                    session.start()
+                } catch (error: Throwable) {
+                    session.destroy()
+                    if (activeSession === session) activeSession = null
+                    throw FlutterError("unknown", "The STT session could not start.")
+                }
             } catch (error: Throwable) {
-                session.destroy()
-                if (activeSession === session) activeSession = null
-                throw FlutterError("unknown", "The STT session could not start.")
+                audioSource?.close()
+                throw error
             }
         } finally {
             if (pendingStart == reservation) pendingStart = null
@@ -213,6 +228,7 @@ internal class AndroidSpeechAdapter(
         destroySupportRecognizers()
         destroyModelDownloadRecognizers()
         modelStatusCache.clear()
+        audioSourceSupportedLocales.clear()
         eventScope.cancel()
     }
 
@@ -239,6 +255,7 @@ internal class AndroidSpeechAdapter(
         destroySupportRecognizers()
         destroyModelDownloadRecognizers()
         modelStatusCache.clear()
+        audioSourceSupportedLocales.clear()
         eventScope.cancel()
     }
 
@@ -249,6 +266,57 @@ internal class AndroidSpeechAdapter(
             if (AndroidSttPolicy.modelStatusCompletesDownloadRequest(status)) {
                 releaseModelDownloadRecognizer(localeKey)
             }
+        }
+
+    private suspend fun supportsAudioSource(locale: String): Boolean {
+        val key = localeKey(locale)
+        if (key in audioSourceSupportedLocales) return true
+        val probe = RecognitionAudioSourceSupportProbe.create()
+        val supported = try {
+            queryIntentSupport(recognitionIntent(locale, probe))
+        } finally {
+            probe.close()
+        }
+        if (supported) audioSourceSupportedLocales += key
+        return supported
+    }
+
+    private suspend fun queryIntentSupport(intent: Intent): Boolean =
+        try {
+            withTimeout(SUPPORT_CHECK_TIMEOUT_MILLIS) {
+                suspendCancellableCoroutine { continuation ->
+                    ensureActiveAndMainThread()
+                    val recognizer = createOnDeviceRecognizer()
+                    supportRecognizers += recognizer
+                    continuation.invokeOnCancellation {
+                        activity.runOnUiThread { releaseSupportRecognizer(recognizer) }
+                    }
+                    try {
+                        recognizer.checkRecognitionSupport(
+                            intent,
+                            activity.mainExecutor,
+                            object : RecognitionSupportCallback {
+                                override fun onSupportResult(
+                                    recognitionSupport: RecognitionSupport,
+                                ) {
+                                    releaseSupportRecognizer(recognizer)
+                                    if (continuation.isActive) continuation.resume(true)
+                                }
+
+                                override fun onError(error: Int) {
+                                    releaseSupportRecognizer(recognizer)
+                                    if (continuation.isActive) continuation.resume(false)
+                                }
+                            },
+                        )
+                    } catch (_: Throwable) {
+                        releaseSupportRecognizer(recognizer)
+                        if (continuation.isActive) continuation.resume(false)
+                    }
+                }
+            }
+        } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+            false
         }
 
     private fun triggerModelDownload(
@@ -378,7 +446,10 @@ internal class AndroidSpeechAdapter(
             )
         }
 
-    private fun recognitionIntent(locale: String) =
+    private fun recognitionIntent(
+        locale: String,
+        audioSource: RecognitionAudioSourceConfiguration? = null,
+    ) =
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
@@ -391,6 +462,7 @@ internal class AndroidSpeechAdapter(
                     RecognizerIntent.FORMATTING_OPTIMIZE_LATENCY,
                 )
                 putExtra(RecognizerIntent.EXTRA_HIDE_PARTIAL_TRAILING_PUNCTUATION, true)
+                audioSource?.configure(this)
             }
         }
 

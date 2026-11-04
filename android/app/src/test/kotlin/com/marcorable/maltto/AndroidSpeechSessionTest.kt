@@ -1,5 +1,6 @@
 package com.marcorable.maltto
 
+import android.content.Intent
 import android.speech.RecognitionListener
 import android.speech.SpeechRecognizer
 import org.junit.Assert.assertEquals
@@ -36,10 +37,34 @@ class AndroidSpeechSessionTest {
     }
 
     @Test
-    fun `cancel emits once and ignores late callbacks`() {
+    fun `segment results advance before segmented session ends`() {
         val recognizer = FakeSpeechRecognizerHandle()
         val events = mutableListOf<NativeSttEvent>()
         val session = session(recognizer, events)
+
+        session.start()
+        session.emitSegmentForTest("첫 구간")
+        session.emitSegmentForTest("다음 구간")
+        session.onEndOfSegmentedSession()
+
+        assertEquals(
+            listOf(
+                NativeSttEventKind.FINAL_RESULT,
+                NativeSttEventKind.FINAL_RESULT,
+                NativeSttEventKind.ENDED,
+            ),
+            events.map { it.kind },
+        )
+        assertEquals(listOf("첫 구간", "다음 구간", null), events.map { it.text })
+        assertTrue(recognizer.destroyed)
+    }
+
+    @Test
+    fun `cancel emits once and ignores late callbacks`() {
+        val recognizer = FakeSpeechRecognizerHandle()
+        val audioSource = FakeRecognitionAudioSource()
+        val events = mutableListOf<NativeSttEvent>()
+        val session = session(recognizer, events, audioSource)
 
         session.cancel(emitEvent = true)
         session.onReadyForSpeech(null)
@@ -50,6 +75,41 @@ class AndroidSpeechSessionTest {
         assertEquals(listOf(NativeSttEventKind.CANCELLED), events.map { it.kind })
         assertTrue(recognizer.cancelled)
         assertTrue(recognizer.destroyed)
+        assertEquals(1, audioSource.closeCount)
+    }
+
+    @Test
+    fun `audio source starts with recognizer and closes on terminal callback`() {
+        val recognizer = FakeSpeechRecognizerHandle()
+        val audioSource = FakeRecognitionAudioSource()
+        val events = mutableListOf<NativeSttEvent>()
+        val session = session(recognizer, events, audioSource)
+
+        session.start()
+        session.finishWithResult("직접 만든 결과")
+        session.destroy()
+
+        assertTrue(audioSource.started)
+        assertEquals(1, audioSource.closeCount)
+    }
+
+    @Test
+    fun `audio source failure emits retryable audio failure and releases resources`() {
+        val recognizer = FakeSpeechRecognizerHandle()
+        val audioSource = FakeRecognitionAudioSource()
+        val events = mutableListOf<NativeSttEvent>()
+        val session = session(recognizer, events, audioSource)
+
+        session.start()
+        audioSource.fail()
+        audioSource.fail()
+
+        assertEquals(listOf(NativeSttEventKind.FAILURE), events.map { it.kind })
+        assertEquals(NativeSttFailureCode.AUDIO, events.single().failureCode)
+        assertEquals(true, events.single().retryable)
+        assertTrue(recognizer.cancelled)
+        assertTrue(recognizer.destroyed)
+        assertEquals(1, audioSource.closeCount)
     }
 
     @Test
@@ -62,25 +122,51 @@ class AndroidSpeechSessionTest {
         assertEquals(true, emptyEvents.single().retryable)
 
         val deniedEvents = mutableListOf<NativeSttEvent>()
-        session(FakeSpeechRecognizerHandle(), deniedEvents).onError(
+        val deniedAudioSource = FakeRecognitionAudioSource()
+        session(FakeSpeechRecognizerHandle(), deniedEvents, deniedAudioSource).onError(
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS,
         )
 
         assertEquals(NativeSttFailureCode.PERMISSION_DENIED, deniedEvents.single().failureCode)
         assertEquals(false, deniedEvents.single().retryable)
+        assertEquals(1, deniedAudioSource.closeCount)
     }
 
     private fun session(
         recognizer: FakeSpeechRecognizerHandle,
         events: MutableList<NativeSttEvent>,
+        audioSource: RecognitionAudioSource? = null,
     ): AndroidSpeechSession =
         AndroidSpeechSession(
             sessionId = "session",
             generation = 7,
             recognizer = recognizer,
+            audioSource = audioSource,
             eventHandler = events::add,
             finishedHandler = {},
         )
+
+}
+
+private class FakeRecognitionAudioSource : RecognitionAudioSource {
+    var started = false
+    var closeCount = 0
+    private var failureHandler: (() -> Unit)? = null
+
+    override fun configure(intent: Intent) = Unit
+
+    override fun start(onFailure: () -> Unit) {
+        started = true
+        failureHandler = onFailure
+    }
+
+    fun fail() {
+        failureHandler?.invoke()
+    }
+
+    override fun close() {
+        closeCount += 1
+    }
 }
 
 private class FakeSpeechRecognizerHandle : SpeechRecognizerHandle {

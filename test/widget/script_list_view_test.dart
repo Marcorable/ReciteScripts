@@ -9,6 +9,22 @@ import 'package:maltto/src/features/scripts/presentation/script_create_view_mode
 import 'package:maltto/src/features/scripts/presentation/script_list_view_model.dart';
 
 void main() {
+  testWidgets('시스템이 다크 모드여도 앱은 라이트 모드를 유지한다', (tester) async {
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    final repository = _WidgetScriptRepository();
+
+    await tester.pumpWidget(_buildApp(repository));
+    await tester.pump();
+
+    final context = tester.element(find.text('저장된 대본이 없습니다.'));
+    expect(CupertinoTheme.of(context).brightness, Brightness.light);
+    expect(
+      CupertinoTheme.of(context).scaffoldBackgroundColor,
+      CupertinoColors.systemBackground.resolveFrom(context),
+    );
+  });
+
   testWidgets('빈 상태에서 대본을 추가하고 목록에서 삭제한다', (tester) async {
     final repository = _WidgetScriptRepository();
     await tester.pumpWidget(_buildApp(repository));

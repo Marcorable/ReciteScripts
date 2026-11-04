@@ -6,7 +6,8 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="말또"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:forceDarkAllowed="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

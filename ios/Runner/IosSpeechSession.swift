@@ -262,8 +262,7 @@ final class IosSpeechSession {
     guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
     let source = AudioBufferBox(buffer)
     let consumed = Mutex(false)
-    var conversionError: NSError?
-    let status = converter.convert(to: output, error: &conversionError) { _, outputStatus in
+    let inputBlock: AVAudioConverterInputBlock = { _, outputStatus in
       let wasConsumed = consumed.withLock { value in
         defer { value = true }
         return value
@@ -275,6 +274,8 @@ final class IosSpeechSession {
       outputStatus.pointee = .haveData
       return source.buffer
     }
+    var conversionError: NSError?
+    let status = converter.convert(to: output, error: &conversionError, withInputFrom: inputBlock)
     guard status != .error, conversionError == nil else { return nil }
     return output
   }

@@ -28,6 +28,28 @@ void main() {
       expect(matcher.match(hypothesis: '오늘 아침에는 창', anchor: 0)?.cursor, 2);
     });
 
+    test('말하지 않은 마지막 어절을 전체 정렬 오차로 완료하지 않는다', () {
+      final matcher = CursorMatcher.fromScript(script);
+
+      final beforeLast = matcher.match(
+        hypothesis: '오늘 아침에는 창문을 열고 바깥 공기를 천천히',
+        anchor: 0,
+      );
+
+      expect(beforeLast?.cursor, 7);
+    });
+
+    test('마지막 어절의 작은 오인식은 완료 근거로 허용한다', () {
+      final matcher = CursorMatcher.fromScript(script);
+
+      final completed = matcher.match(
+        hypothesis: '오늘 아침에는 창문을 열고 바깥 공기를 천천히 마셨따',
+        anchor: 0,
+      );
+
+      expect(completed?.cursor, 8);
+    });
+
     test('무관한 발화와 너무 짧은 발화를 거부한다', () {
       final matcher = CursorMatcher.fromScript(script);
 

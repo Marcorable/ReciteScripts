@@ -52,6 +52,7 @@ final class ReadingSessionReducer {
       currentWord: currentWordIndex == null
           ? null
           : tokens[currentWordIndex].text,
+      words: List.unmodifiable(tokens.map((token) => token.text)),
       totalWords: tokens.length,
       elapsed: _elapsed,
       generation: _generation,
@@ -90,7 +91,16 @@ final class ReadingSessionReducer {
     _generation++;
     _lastSequence = -1;
     _progress.resetForNextRepetition();
+    _status = ReadingSessionStatus.awaitingNextRepetition;
     return ReadingSessionTransition.repetitionCompleted;
+  }
+
+  ReadingSessionTransition continueNextRepetition() {
+    if (_status != ReadingSessionStatus.awaitingNextRepetition) {
+      return ReadingSessionTransition.ignored;
+    }
+    _status = ReadingSessionStatus.running;
+    return ReadingSessionTransition.nextRepetitionStarted;
   }
 
   ReadingSessionTransition updateElapsed(Duration elapsed) {
@@ -99,6 +109,19 @@ final class ReadingSessionReducer {
     }
     _elapsed = elapsed;
     return ReadingSessionTransition.progressed;
+  }
+
+  ReadingSessionTransition moveBackOneWord() {
+    if (_status != ReadingSessionStatus.running || _progress.cursor == 0) {
+      return ReadingSessionTransition.ignored;
+    }
+    final update = _progress.moveBackOneWord();
+    if (!update.cursorChanged) return ReadingSessionTransition.ignored;
+
+    _generation++;
+    _lastSequence = -1;
+    _progress.beginNewTranscriptSegment();
+    return ReadingSessionTransition.movedBack;
   }
 
   ReadingSessionTransition restartRecognition({
@@ -133,7 +156,8 @@ final class ReadingSessionReducer {
   }
 
   ReadingSessionTransition exit() {
-    if (_status != ReadingSessionStatus.running) {
+    if (_status == ReadingSessionStatus.completed ||
+        _status == ReadingSessionStatus.exited) {
       return ReadingSessionTransition.ignored;
     }
     _status = ReadingSessionStatus.exited;
