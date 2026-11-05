@@ -577,6 +577,7 @@ interface NativeSttHostApi {
   suspend fun checkAvailability(locale: String): NativeSttAvailability
   suspend fun prepare(locale: String): NativeSttPreparation
   suspend fun requestModelDownload(locale: String): NativeSttPreparation
+  suspend fun openAppSettings(): Boolean
   suspend fun start(request: NativeSttStartRequest)
   suspend fun cancel(sessionId: String)
   suspend fun dispose()
@@ -637,6 +638,23 @@ interface NativeSttHostApi {
             CoroutineScope(Dispatchers.Main).launch {
               val wrapped: List<Any?> = try {
                 listOf(api.requestModelDownload(localeArg))
+              } catch (exception: Throwable) {
+                SttApiPigeonUtils.wrapError(exception)
+              }
+              reply.reply(wrapped)
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.maltto.NativeSttHostApi.openAppSettings$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            CoroutineScope(Dispatchers.Main).launch {
+              val wrapped: List<Any?> = try {
+                listOf(api.openAppSettings())
               } catch (exception: Throwable) {
                 SttApiPigeonUtils.wrapError(exception)
               }

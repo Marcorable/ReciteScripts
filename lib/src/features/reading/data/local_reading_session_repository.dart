@@ -81,6 +81,12 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
       try {
         await _sttService.start(_requestFor(initialState));
         _ensureStartActive(startAttempt);
+      } on SttStartException catch (error) {
+        reducer.exit();
+        await _cleanUpActiveResources(initialState.sessionId);
+        throw ReadingSessionStartException(
+          _preparationForStartFailure(error.code),
+        );
       } on Object {
         reducer.exit();
         await _cleanUpActiveResources(initialState.sessionId);
@@ -110,6 +116,7 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
         sessionId: event.sessionId,
         generation: event.generation,
         sequence: event.sequence,
+        failure: _sessionFailureFor(event.failureCode),
       );
       if (transition == ReadingSessionTransition.ignored) return;
 
@@ -298,6 +305,36 @@ final class LocalReadingSessionRepository implements ReadingSessionRepository {
     }
     return _sttService.requestModelDownload(locale: _locale);
   }
+
+  SttPreparation _preparationForStartFailure(
+    SttFailureCode code,
+  ) => SttPreparation(
+    status: switch (code) {
+      SttFailureCode.permissionDenied => SttPreparationStatus.permissionDenied,
+      SttFailureCode.modelMissing => SttPreparationStatus.modelDownloadRequired,
+      SttFailureCode.onDeviceUnavailable ||
+      SttFailureCode.localeUnsupported => SttPreparationStatus.unsupported,
+      _ => SttPreparationStatus.ready,
+    },
+    failureCode: code,
+  );
+
+  ReadingSessionFailure _sessionFailureFor(SttFailureCode? code) =>
+      switch (code) {
+        SttFailureCode.permissionDenied =>
+          ReadingSessionFailure.permissionDenied,
+        SttFailureCode.modelMissing => ReadingSessionFailure.modelUnavailable,
+        SttFailureCode.onDeviceUnavailable ||
+        SttFailureCode.localeUnsupported => ReadingSessionFailure.unsupported,
+        SttFailureCode.audio ||
+        SttFailureCode.audioFormatMismatch ||
+        SttFailureCode.busy => ReadingSessionFailure.audioUnavailable,
+        SttFailureCode.interrupted => ReadingSessionFailure.interrupted,
+        _ => ReadingSessionFailure.unknown,
+      };
+
+  @override
+  Future<bool> openAppSettings() => _sttService.openAppSettings();
 
   @override
   Future<void> dispose() async {

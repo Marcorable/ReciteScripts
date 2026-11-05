@@ -292,6 +292,7 @@ void main() {
     await pumpEventQueue(times: 10);
 
     expect(repository.state?.status, ReadingSessionStatus.exited);
+    expect(repository.state?.failure, ReadingSessionFailure.permissionDenied);
     expect(sttService.cancelledSessionIds, ['reading-1']);
     expect(sttService.subscriptionCancelCount, 1);
     expect(timerFactory.timer.isActive, isFalse);
@@ -409,6 +410,37 @@ void main() {
     expect(sttService.modelDownloadRequestCount, 1);
     expect(sttService.startedGenerations, isEmpty);
   });
+
+  test('오디오 시작 오류는 복구 UI가 구분할 수 있는 준비 오류로 변환한다', () async {
+    sttService.startError = const SttStartException(SttFailureCode.audio);
+
+    await expectLater(
+      repository.start(script: _script, repetitions: 1),
+      throwsA(
+        isA<ReadingSessionStartException>()
+            .having(
+              (error) => error.preparation.status,
+              'status',
+              SttPreparationStatus.ready,
+            )
+            .having(
+              (error) => error.preparation.failureCode,
+              'failureCode',
+              SttFailureCode.audio,
+            ),
+      ),
+    );
+
+    expect(repository.state?.status, ReadingSessionStatus.exited);
+    expect(sttService.cancelledSessionIds, ['reading-1']);
+  });
+
+  test('앱 설정 열기를 STT 서비스에 위임한다', () async {
+    sttService.openAppSettingsResult = true;
+
+    expect(await repository.openAppSettings(), isTrue);
+    expect(sttService.openAppSettingsCallCount, 1);
+  });
 }
 
 const _body = '아침에는 창문을 열고 문장을 읽는다';
@@ -472,6 +504,9 @@ final class _FakeSttService implements SttService {
   Completer<void>? startBarrier;
   Completer<void>? prepareBarrier;
   Object? cancelError;
+  Object? startError;
+  bool openAppSettingsResult = false;
+  int openAppSettingsCallCount = 0;
 
   void emit(SttEvent event) => _events.add(event);
 
@@ -495,12 +530,20 @@ final class _FakeSttService implements SttService {
   }
 
   @override
+  Future<bool> openAppSettings() async {
+    openAppSettingsCallCount++;
+    return openAppSettingsResult;
+  }
+
+  @override
   Stream<SttEvent> events(String sessionId) => _events.stream;
 
   @override
   Future<void> start(SttStartRequest request) async {
     startedGenerations.add(request.generation);
     await startBarrier?.future;
+    final startError = this.startError;
+    if (startError != null) throw startError;
   }
 
   @override

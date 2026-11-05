@@ -36,6 +36,7 @@ final class ReadingSessionReducer {
   int _generation = 1;
   int _lastSequence = -1;
   Duration _elapsed = Duration.zero;
+  ReadingSessionFailure? _failure;
 
   ReadingSessionState get state {
     final tokens = _progress.matcher.tokens;
@@ -56,6 +57,7 @@ final class ReadingSessionReducer {
       totalWords: tokens.length,
       elapsed: _elapsed,
       generation: _generation,
+      failure: _failure,
     );
   }
 
@@ -145,6 +147,7 @@ final class ReadingSessionReducer {
     required String sessionId,
     required int generation,
     required int sequence,
+    required ReadingSessionFailure failure,
   }) {
     if (_status != ReadingSessionStatus.running ||
         sessionId != _sessionId ||
@@ -152,15 +155,16 @@ final class ReadingSessionReducer {
         sequence <= _lastSequence) {
       return ReadingSessionTransition.ignored;
     }
-    return exit();
+    return exit(failure: failure);
   }
 
-  ReadingSessionTransition exit() {
+  ReadingSessionTransition exit({ReadingSessionFailure? failure}) {
     if (_status == ReadingSessionStatus.completed ||
         _status == ReadingSessionStatus.exited) {
       return ReadingSessionTransition.ignored;
     }
     _status = ReadingSessionStatus.exited;
+    _failure = failure;
     _generation++;
     return ReadingSessionTransition.exited;
   }

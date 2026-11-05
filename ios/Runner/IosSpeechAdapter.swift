@@ -156,6 +156,11 @@ final class IosSpeechAdapter: NSObject, NativeSttHostApi {
     }
   }
 
+  func openAppSettings() async throws -> Bool {
+    guard let url = URL(string: UIApplication.openSettingsURLString) else { return false }
+    return await UIApplication.shared.open(url)
+  }
+
   func start(request: NativeSttStartRequest) async throws {
     guard activeSession == nil, pendingStart == nil else {
       throw PigeonError(code: "busy", message: "An STT session is already active.", details: nil)

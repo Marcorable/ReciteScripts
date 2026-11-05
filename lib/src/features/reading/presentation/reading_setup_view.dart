@@ -52,6 +52,10 @@ final class _ReadingSetupViewState extends State<ReadingSetupView>
     );
   }
 
+  Future<void> _openAppSettings() async {
+    await widget.viewModel.openAppSettings();
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -102,6 +106,23 @@ final class _ReadingSetupViewState extends State<ReadingSetupView>
                       ),
                     ),
                   ),
+                  if (issue == ReadingSetupStartIssue.permissionDenied) ...[
+                    const SizedBox(height: AppSpacing.small),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: AppTargets.preferredConstraints,
+                        child: CupertinoButton(
+                          key: const Key('reading-setup-settings-button'),
+                          onPressed: widget.viewModel.isOpeningSettings
+                              ? null
+                              : _openAppSettings,
+                          child: widget.viewModel.isOpeningSettings
+                              ? const CupertinoActivityIndicator()
+                              : const Text('설정 열기'),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
                 const SizedBox(height: AppSpacing.section),
                 Semantics(
@@ -136,7 +157,9 @@ final class _ReadingSetupViewState extends State<ReadingSetupView>
                         constraints: AppTargets.preferredConstraints,
                         child: CupertinoButton(
                           key: const Key('reading-setup-cancel-button'),
-                          onPressed: widget.viewModel.isStarting
+                          onPressed:
+                              widget.viewModel.isStarting ||
+                                  widget.viewModel.isOpeningSettings
                               ? null
                               : () => Navigator.of(context).pop(),
                           child: const Text('취소'),
@@ -149,14 +172,20 @@ final class _ReadingSetupViewState extends State<ReadingSetupView>
                         constraints: AppTargets.preferredConstraints,
                         child: CupertinoButton.filled(
                           key: const Key('reading-setup-start-button'),
-                          onPressed: widget.viewModel.isStarting
+                          onPressed:
+                              widget.viewModel.isStarting ||
+                                  widget.viewModel.isOpeningSettings
                               ? null
                               : _start,
                           child: widget.viewModel.isStarting
                               ? const CupertinoActivityIndicator(
                                   color: CupertinoColors.white,
                                 )
-                              : const Text('시작'),
+                              : Text(
+                                  _startButtonLabel(
+                                    widget.viewModel.startIssue,
+                                  ),
+                                ),
                         ),
                       ),
                     ),
@@ -172,11 +201,24 @@ final class _ReadingSetupViewState extends State<ReadingSetupView>
 
   String _startIssueMessage(ReadingSetupStartIssue issue) => switch (issue) {
     ReadingSetupStartIssue.permissionRequired =>
-      '마이크와 음성 인식 권한을 허용한 뒤 다시 시작해 주세요.',
+      '낭독을 시작하려면 마이크와 음성 인식 권한이 필요합니다.',
+    ReadingSetupStartIssue.permissionDenied =>
+      '마이크 또는 음성 인식 권한이 꺼져 있습니다. 시스템 설정에서 권한을 허용해 주세요.',
     ReadingSetupStartIssue.modelPreparing =>
       '한국어 음성 모델을 준비 중입니다. 준비가 끝나면 다시 시작해 주세요.',
     ReadingSetupStartIssue.unsupported => '이 기기에서 온디바이스 한국어 음성 인식을 사용할 수 없습니다.',
+    ReadingSetupStartIssue.audioUnavailable =>
+      '다른 앱이 마이크를 사용 중이거나 오디오를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+    ReadingSetupStartIssue.interrupted =>
+      '전화나 다른 오디오 작업으로 음성 인식이 중단되었습니다. 방해가 끝난 뒤 다시 시도해 주세요.',
     ReadingSetupStartIssue.temporaryFailure =>
       '음성 인식을 준비하지 못했습니다. 잠시 후 다시 시작해 주세요.',
+  };
+
+  String _startButtonLabel(ReadingSetupStartIssue? issue) => switch (issue) {
+    null => '시작',
+    ReadingSetupStartIssue.permissionRequired => '권한 허용하고 시작',
+    ReadingSetupStartIssue.modelPreparing => '준비 상태 확인',
+    _ => '다시 시도',
   };
 }

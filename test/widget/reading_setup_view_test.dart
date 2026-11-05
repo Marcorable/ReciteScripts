@@ -142,6 +142,70 @@ void main() {
     );
   });
 
+  testWidgets('권한 거부는 설정 열기와 다시 확인을 제공한다', (tester) async {
+    final readingRepository = _ReadingRepository(
+      startException: const ReadingSessionStartException(
+        SttPreparation(status: SttPreparationStatus.permissionDenied),
+      ),
+      openSettingsResult: true,
+    );
+    addTearDown(readingRepository.dispose);
+
+    await tester.pumpWidget(
+      CupertinoApp(
+        home: ReadingSetupView(
+          viewModel: ReadingSetupViewModel(
+            script: _script,
+            repository: readingRepository,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('reading-setup-start-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('시스템 설정에서 권한을 허용'), findsOneWidget);
+    expect(find.text('다시 시도'), findsOneWidget);
+    expect(
+      tester
+          .getSize(find.byKey(const Key('reading-setup-settings-button')))
+          .height,
+      greaterThanOrEqualTo(48),
+    );
+
+    await tester.tap(find.byKey(const Key('reading-setup-settings-button')));
+    await tester.pumpAndSettle();
+    expect(readingRepository.openSettingsCallCount, 1);
+  });
+
+  testWidgets('오디오 시작 실패는 충돌 가능성과 재시도를 안내한다', (tester) async {
+    final readingRepository = _ReadingRepository(
+      startException: const ReadingSessionStartException(
+        SttPreparation(
+          status: SttPreparationStatus.ready,
+          failureCode: SttFailureCode.audio,
+        ),
+      ),
+    );
+    addTearDown(readingRepository.dispose);
+
+    await tester.pumpWidget(
+      CupertinoApp(
+        home: ReadingSetupView(
+          viewModel: ReadingSetupViewModel(
+            script: _script,
+            repository: readingRepository,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('reading-setup-start-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('다른 앱이 마이크를 사용 중'), findsOneWidget);
+    expect(find.text('다시 시도'), findsOneWidget);
+  });
+
   testWidgets('시작 준비 중 백그라운드 전환은 시작 요청을 취소한다', (tester) async {
     final startBarrier = Completer<void>();
     final readingRepository = _ReadingRepository(startBarrier: startBarrier);
@@ -222,16 +286,22 @@ final class _ScriptRepository implements ScriptRepository {
 }
 
 final class _ReadingRepository implements ReadingSessionRepository {
-  _ReadingRepository({this.startException, this.startBarrier});
+  _ReadingRepository({
+    this.startException,
+    this.startBarrier,
+    this.openSettingsResult = false,
+  });
 
   final ReadingSessionStartException? startException;
   final Completer<void>? startBarrier;
+  final bool openSettingsResult;
   final StreamController<ReadingSessionState> _controller =
       StreamController<ReadingSessionState>.broadcast(sync: true);
 
   Script? startedScript;
   int? startedRepetitions;
   int leaveCallCount = 0;
+  int openSettingsCallCount = 0;
   ReadingSessionState? _state;
   bool _disposed = false;
 
@@ -297,6 +367,12 @@ final class _ReadingRepository implements ReadingSessionRepository {
 
   @override
   Future<void> continueNextRepetition() async {}
+
+  @override
+  Future<bool> openAppSettings() async {
+    openSettingsCallCount++;
+    return openSettingsResult;
+  }
 
   @override
   Future<void> dispose() async {

@@ -136,6 +136,27 @@ void main() {
     expect(repository.state?.status, ReadingSessionStatus.exited);
   });
 
+  testWidgets('복구 불가 STT 오류는 원인과 안전한 목록 복귀를 알린다', (tester) async {
+    final repository = _ReadingRepository(
+      _state(
+        status: ReadingSessionStatus.exited,
+        failure: ReadingSessionFailure.audioUnavailable,
+        generation: 2,
+      ),
+    );
+    final semantics = tester.ensureSemantics();
+    await _pumpView(tester, repository);
+
+    expect(find.text('음성 인식을 계속할 수 없습니다'), findsOneWidget);
+    expect(find.textContaining('오디오 충돌'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('음성 인식 오류.*오디오 충돌')), findsOneWidget);
+    expect(
+      find.byKey(const Key('reading-exited-return-button')),
+      findsOneWidget,
+    );
+    semantics.dispose();
+  });
+
   testWidgets('회차 완료는 중앙 확인창에서 이어하기 전까지 다음 STT를 대기한다', (tester) async {
     final repository = _ReadingRepository(
       _state(currentWordIndex: 3, totalRepetitions: 2),
@@ -305,6 +326,7 @@ ReadingSessionState _state({
   List<String> words = const ['오늘', '읽을', '문장을', '천천히', '말합니다'],
   Duration elapsed = Duration.zero,
   int generation = 1,
+  ReadingSessionFailure? failure,
 }) {
   final index = currentWordIndex as int?;
   return ReadingSessionState(
@@ -319,6 +341,7 @@ ReadingSessionState _state({
     totalWords: words.length,
     elapsed: elapsed,
     generation: generation,
+    failure: failure,
   );
 }
 
@@ -375,6 +398,9 @@ final class _ReadingRepository implements ReadingSessionRepository {
   }
 
   @override
+  Future<bool> openAppSettings() => throw UnimplementedError();
+
+  @override
   Future<void> leave() async {
     if (_disposed) return;
     if (_state.status == ReadingSessionStatus.completed ||
@@ -409,6 +435,7 @@ ReadingSessionState _copyState(
   ReadingSessionStatus? status,
   int? currentWordIndex,
   int? generation,
+  ReadingSessionFailure? failure,
 }) => ReadingSessionState(
   sessionId: state.sessionId,
   scriptTitle: state.scriptTitle,
@@ -421,4 +448,5 @@ ReadingSessionState _copyState(
   totalWords: state.totalWords,
   elapsed: state.elapsed,
   generation: generation ?? state.generation,
+  failure: failure ?? state.failure,
 );

@@ -5,8 +5,10 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Looper
+import android.provider.Settings
 import android.speech.ModelDownloadListener
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
@@ -139,6 +141,17 @@ internal class AndroidSpeechAdapter(
                 NativeSttPreparation(NativeSttPreparationStatus.MODEL_DOWNLOADING)
             }
         }
+    }
+
+    override suspend fun openAppSettings(): Boolean {
+        ensureActiveAndMainThread()
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", activity.packageName, null),
+        )
+        if (intent.resolveActivity(activity.packageManager) == null) return false
+        activity.startActivity(intent)
+        return true
     }
 
     override suspend fun start(request: NativeSttStartRequest) {
