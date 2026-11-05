@@ -136,7 +136,7 @@ void main() {
     expect(repository.state?.status, ReadingSessionStatus.exited);
   });
 
-  testWidgets('복구 불가 STT 오류는 원인과 안전한 목록 복귀를 알린다', (tester) async {
+  testWidgets('복구 불가 STT 오류는 원인을 한 번만 알리고 목록 복귀를 제공한다', (tester) async {
     final repository = _ReadingRepository(
       _state(
         status: ReadingSessionStatus.exited,
@@ -148,8 +148,20 @@ void main() {
     await _pumpView(tester, repository);
 
     expect(find.text('음성 인식을 계속할 수 없습니다'), findsOneWidget);
-    expect(find.textContaining('오디오 충돌'), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp('음성 인식 오류.*오디오 충돌')), findsOneWidget);
+    expect(find.textContaining('오디오 입력을 사용할 수 없습니다'), findsOneWidget);
+    expect(find.textContaining('다른 앱'), findsNothing);
+    expect(
+      find.bySemanticsLabel(RegExp('음성 인식 오류.*오디오 입력을 사용할 수 없습니다')),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('음성 인식을 계속할 수 없습니다'), findsNothing);
+    expect(
+      find.bySemanticsLabel(
+        '음성 인식에 필요한 오디오 입력을 사용할 수 없습니다. 목록으로 돌아가 마이크와 기기 지원 상태를 확인해 주세요.',
+      ),
+      findsNothing,
+    );
+    expect(find.bySemanticsLabel('목록으로'), findsOneWidget);
     expect(
       find.byKey(const Key('reading-exited-return-button')),
       findsOneWidget,

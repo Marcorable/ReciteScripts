@@ -208,7 +208,7 @@ final class _ReadingSetupViewState extends State<ReadingSetupView>
       '한국어 음성 모델을 준비 중입니다. 준비가 끝나면 다시 시작해 주세요.',
     ReadingSetupStartIssue.unsupported => '이 기기에서 온디바이스 한국어 음성 인식을 사용할 수 없습니다.',
     ReadingSetupStartIssue.audioUnavailable =>
-      '다른 앱이 마이크를 사용 중이거나 오디오를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+      '음성 인식에 필요한 오디오 입력을 시작할 수 없습니다. 마이크와 기기 지원 상태를 확인해 주세요.',
     ReadingSetupStartIssue.interrupted =>
       '전화나 다른 오디오 작업으로 음성 인식이 중단되었습니다. 방해가 끝난 뒤 다시 시도해 주세요.',
     ReadingSetupStartIssue.temporaryFailure =>

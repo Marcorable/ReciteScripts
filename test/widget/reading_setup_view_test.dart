@@ -178,12 +178,12 @@ void main() {
     expect(readingRepository.openSettingsCallCount, 1);
   });
 
-  testWidgets('오디오 시작 실패는 충돌 가능성과 재시도를 안내한다', (tester) async {
+  testWidgets('지원하지 않는 오디오 입력은 원인을 단정하지 않고 안내한다', (tester) async {
     final readingRepository = _ReadingRepository(
       startException: const ReadingSessionStartException(
         SttPreparation(
           status: SttPreparationStatus.ready,
-          failureCode: SttFailureCode.audio,
+          failureCode: SttFailureCode.audioFormatMismatch,
         ),
       ),
     );
@@ -202,7 +202,8 @@ void main() {
     await tester.tap(find.byKey(const Key('reading-setup-start-button')));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('다른 앱이 마이크를 사용 중'), findsOneWidget);
+    expect(find.textContaining('오디오 입력을 시작할 수 없습니다'), findsOneWidget);
+    expect(find.textContaining('다른 앱'), findsNothing);
     expect(find.text('다시 시도'), findsOneWidget);
   });
 

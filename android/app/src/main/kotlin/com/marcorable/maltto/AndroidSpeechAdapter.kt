@@ -2,6 +2,7 @@ package com.marcorable.maltto
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -149,9 +150,12 @@ internal class AndroidSpeechAdapter(
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
             Uri.fromParts("package", activity.packageName, null),
         )
-        if (intent.resolveActivity(activity.packageManager) == null) return false
-        activity.startActivity(intent)
-        return true
+        return try {
+            activity.startActivity(intent)
+            true
+        } catch (_: ActivityNotFoundException) {
+            false
+        }
     }
 
     override suspend fun start(request: NativeSttStartRequest) {
