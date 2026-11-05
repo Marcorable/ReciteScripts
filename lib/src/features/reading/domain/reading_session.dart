@@ -1,5 +1,14 @@
 enum ReadingSessionStatus { running, awaitingNextRepetition, completed, exited }
 
+enum ReadingSessionFailure {
+  permissionDenied,
+  modelUnavailable,
+  unsupported,
+  audioUnavailable,
+  interrupted,
+  unknown,
+}
+
 final class ReadingSessionState {
   const ReadingSessionState({
     required this.sessionId,
@@ -13,6 +22,7 @@ final class ReadingSessionState {
     required this.totalWords,
     required this.elapsed,
     required this.generation,
+    this.failure,
   });
 
   final String sessionId;
@@ -25,6 +35,7 @@ final class ReadingSessionState {
   final List<String> words;
   final int totalWords;
   final Duration elapsed;
+  final ReadingSessionFailure? failure;
 
   /// 현재 STT 작업만 이 값을 사용한다. 회차 경계와 종료에서 즉시 증가한다.
   final int generation;

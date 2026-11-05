@@ -542,6 +542,7 @@ protocol NativeSttHostApi {
   func checkAvailability(locale: String) async throws -> NativeSttAvailability
   func prepare(locale: String) async throws -> NativeSttPreparation
   func requestModelDownload(locale: String) async throws -> NativeSttPreparation
+  func openAppSettings() async throws -> Bool
   func start(request: NativeSttStartRequest) async throws
   func cancel(sessionId: String) async throws
   func dispose() async throws
@@ -603,6 +604,21 @@ class NativeSttHostApiSetup {
       }
     } else {
       requestModelDownloadChannel.setMessageHandler(nil)
+    }
+    let openAppSettingsChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.maltto.NativeSttHostApi.openAppSettings\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      openAppSettingsChannel.setMessageHandler { _, reply in
+        Task { @MainActor in
+          do {
+            let result = try await api.openAppSettings()
+            reply(wrapResult(result))
+          } catch {
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      openAppSettingsChannel.setMessageHandler(nil)
     }
     let startChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.maltto.NativeSttHostApi.start\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {

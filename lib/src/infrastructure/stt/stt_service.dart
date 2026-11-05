@@ -7,6 +7,8 @@ abstract interface class SttService {
 
   Future<SttPreparation> requestModelDownload({required String locale});
 
+  Future<bool> openAppSettings();
+
   Stream<SttEvent> events(String sessionId);
 
   Future<void> start(SttStartRequest request);

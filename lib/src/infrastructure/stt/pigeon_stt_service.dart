@@ -37,6 +37,12 @@ final class PigeonSttService implements SttService, pigeon.NativeSttFlutterApi {
     return _preparationFromNative(await _host.requestModelDownload(locale));
   }
 
+  @override
+  Future<bool> openAppSettings() async {
+    _ensureActive();
+    return _host.openAppSettings();
+  }
+
   SttPreparation _preparationFromNative(pigeon.NativeSttPreparation native) {
     return SttPreparation(
       status: SttPreparationStatus.values[native.status.index],

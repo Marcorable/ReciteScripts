@@ -2,11 +2,14 @@ package com.marcorable.maltto
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Looper
+import android.provider.Settings
 import android.speech.ModelDownloadListener
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
@@ -138,6 +141,20 @@ internal class AndroidSpeechAdapter(
                 }
                 NativeSttPreparation(NativeSttPreparationStatus.MODEL_DOWNLOADING)
             }
+        }
+    }
+
+    override suspend fun openAppSettings(): Boolean {
+        ensureActiveAndMainThread()
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", activity.packageName, null),
+        )
+        return try {
+            activity.startActivity(intent)
+            true
+        } catch (_: ActivityNotFoundException) {
+            false
         }
     }
 

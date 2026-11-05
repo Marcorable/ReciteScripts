@@ -22,6 +22,8 @@ abstract interface class ReadingSessionRepository {
 
   Future<void> continueNextRepetition();
 
+  Future<bool> openAppSettings();
+
   Future<void> leave();
 
   Future<void> dispose();

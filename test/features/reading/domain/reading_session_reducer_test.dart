@@ -254,16 +254,19 @@ void main() {
         sessionId: 'session-1',
         generation: 1,
         sequence: 1,
+        failure: ReadingSessionFailure.audioUnavailable,
       );
       final duplicate = reducer.exitAfterRecognitionFailure(
         sessionId: 'session-1',
         generation: 1,
         sequence: 2,
+        failure: ReadingSessionFailure.unknown,
       );
 
       expect(exited, ReadingSessionTransition.exited);
       expect(duplicate, ReadingSessionTransition.ignored);
       expect(reducer.state.status, ReadingSessionStatus.exited);
+      expect(reducer.state.failure, ReadingSessionFailure.audioUnavailable);
       expect(reducer.state.generation, 2);
     });
 

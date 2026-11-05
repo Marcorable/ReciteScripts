@@ -33,6 +33,7 @@ void main() {
   setUp(() {
     setHostHandler('dispose', (_) => ok(null));
     setHostHandler('cancel', (_) => ok(null));
+    setHostHandler('openAppSettings', (_) => ok(true));
   });
 
   tearDown(() {
@@ -40,6 +41,7 @@ void main() {
       'checkAvailability',
       'prepare',
       'requestModelDownload',
+      'openAppSettings',
       'start',
       'cancel',
       'dispose',
@@ -98,6 +100,13 @@ void main() {
 
     expect(preparation.status, SttPreparationStatus.modelDownloading);
     expect(preparation.failureCode, isNull);
+    await service.dispose();
+  });
+
+  test('앱 설정 열기 결과를 전달한다', () async {
+    final service = PigeonSttService();
+
+    expect(await service.openAppSettings(), isTrue);
     await service.dispose();
   });
 

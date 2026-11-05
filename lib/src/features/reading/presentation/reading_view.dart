@@ -215,6 +215,7 @@ final class _ReadingViewState extends State<ReadingView>
                   onReturn: _returnToList,
                 ),
                 ReadingSessionStatus.exited => _ExitedSession(
+                  failure: state.failure,
                   onReturn: _returnToList,
                 ),
               };

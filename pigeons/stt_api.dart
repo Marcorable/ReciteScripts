@@ -119,6 +119,9 @@ abstract class NativeSttHostApi {
   NativeSttPreparation requestModelDownload(String locale);
 
   @async
+  bool openAppSettings();
+
+  @async
   void start(NativeSttStartRequest request);
 
   @async
