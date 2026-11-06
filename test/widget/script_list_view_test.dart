@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maltto/src/app/app.dart';
 import 'package:maltto/src/features/scripts/data/script_repository.dart';
@@ -114,25 +116,146 @@ void main() {
     expect(repository.scripts, isEmpty);
   });
 
-  testWidgets('Android 내비게이션 조작의 실제 터치 영역이 48 이상이다', (tester) async {
+  testWidgets('iOS와 Android에서 추가 버튼의 화면 위치가 같다', (tester) async {
+    final originalPlatform = debugDefaultTargetPlatformOverride;
+    final buttonRects = <TargetPlatform, Rect>{};
+    final labelRects = <TargetPlatform, Rect>{};
+
+    try {
+      for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+        debugDefaultTargetPlatformOverride = platform;
+        final repository = _WidgetScriptRepository();
+
+        await tester.pumpWidget(_buildApp(repository));
+        await tester.pumpAndSettle();
+
+        buttonRects[platform] = tester.getRect(
+          find.byKey(const Key('script-list-add-button')),
+        );
+        labelRects[platform] = tester.getRect(find.text('추가'));
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    } finally {
+      debugDefaultTargetPlatformOverride = originalPlatform;
+    }
+
+    expect(
+      buttonRects[TargetPlatform.android],
+      buttonRects[TargetPlatform.iOS],
+    );
+    expect(labelRects[TargetPlatform.android], labelRects[TargetPlatform.iOS]);
+    expect(
+      labelRects[TargetPlatform.iOS]!.center.dy,
+      kMinInteractiveDimensionCupertino / 2,
+    );
+  });
+
+  testWidgets('Android 추가 버튼은 48 실제 터치 영역과 Semantics를 제공한다', (tester) async {
+    final originalPlatform = debugDefaultTargetPlatformOverride;
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
     final repository = _WidgetScriptRepository();
+    final semantics = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(_buildApp(repository));
+      await tester.pumpAndSettle();
+
+      final listAddButton = find.byKey(const Key('script-list-add-button'));
+      final buttonRect = tester.getRect(listAddButton);
+      expect(buttonRect.width, greaterThanOrEqualTo(48));
+      expect(buttonRect.height, greaterThanOrEqualTo(48));
+      final addButtonSemantics = find.bySemanticsLabel('새 대본 추가');
+      expect(addButtonSemantics, findsOneWidget);
+      expect(
+        tester
+            .getSemantics(addButtonSemantics)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      final buttonRenderObject = tester.renderObject(listAddButton);
+      for (final position in [
+        buttonRect.topLeft + const Offset(1, 1),
+        buttonRect.bottomRight - const Offset(1, 1),
+      ]) {
+        final hitTest = tester.hitTestOnBinding(position);
+        expect(
+          hitTest.path.any((entry) => entry.target == buttonRenderObject),
+          isTrue,
+        );
+      }
+
+      await tester.tap(listAddButton);
+      await tester.pumpAndSettle();
+      for (final key in [
+        const Key('script-create-cancel-button'),
+        const Key('script-create-save-button'),
+      ]) {
+        final button = find.byKey(key);
+        expect(tester.getSize(button).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
+      }
+    } finally {
+      semantics.dispose();
+      debugDefaultTargetPlatformOverride = originalPlatform;
+    }
+  });
+
+  testWidgets('Android 큰 글씨에서도 우측 상단 추가 버튼이 잘리지 않는다', (tester) async {
+    final originalPlatform = debugDefaultTargetPlatformOverride;
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    tester.platformDispatcher.textScaleFactorTestValue = 3.2;
+    final repository = _WidgetScriptRepository();
+
+    try {
+      await tester.pumpWidget(_buildApp(repository));
+      await tester.pumpAndSettle();
+
+      final buttonRect = tester.getRect(
+        find.byKey(const Key('script-list-add-button')),
+      );
+      final screenRect = tester.getRect(find.byType(CupertinoPageScaffold));
+      final labelRect = tester.getRect(find.text('추가'));
+
+      expect(tester.takeException(), isNull);
+      expect(buttonRect.width, greaterThanOrEqualTo(48));
+      expect(buttonRect.height, greaterThanOrEqualTo(48));
+      expect(buttonRect.top, screenRect.top);
+      expect(buttonRect.right, screenRect.right - 16);
+      expect(buttonRect.contains(labelRect.topLeft), isTrue);
+      expect(buttonRect.contains(labelRect.bottomRight), isTrue);
+    } finally {
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+      debugDefaultTargetPlatformOverride = originalPlatform;
+    }
+  });
+
+  testWidgets('대형 제목이 축소되는 동안 추가 버튼은 우측 상단을 유지한다', (tester) async {
+    final repository = _WidgetScriptRepository(
+      initialScripts: List.generate(
+        20,
+        (index) => _script(
+          id: index + 1,
+          title: '직접 작성한 대본 ${index + 1}',
+          body: '직접 작성한 문장을 천천히 읽습니다.',
+        ),
+      ),
+    );
+
     await tester.pumpWidget(_buildApp(repository));
     await tester.pumpAndSettle();
 
-    final listAddButton = find.byKey(const Key('script-list-add-button'));
-    expect(tester.getSize(listAddButton).width, greaterThanOrEqualTo(48));
-    expect(tester.getSize(listAddButton).height, greaterThanOrEqualTo(48));
+    final addButton = find.byKey(const Key('script-list-add-button'));
+    final initialButtonRect = tester.getRect(addButton);
 
-    await tester.tap(listAddButton);
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pumpAndSettle();
-    for (final key in [
-      const Key('script-create-cancel-button'),
-      const Key('script-create-save-button'),
-    ]) {
-      final button = find.byKey(key);
-      expect(tester.getSize(button).width, greaterThanOrEqualTo(48));
-      expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
-    }
+
+    final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
+    expect(scrollable.position.pixels, greaterThan(52));
+    expect(tester.getRect(addButton), initialButtonRect);
   });
 
   testWidgets('큰 글씨에서 긴 제목이 줄바꿈되고 주요 터치 영역이 48 이상이다', (tester) async {
