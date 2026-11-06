@@ -2,9 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:maltto/src/shared/design/app_tokens.dart';
 
-// Flutter's Cupertino navigation bar applies this ceiling to toolbar text.
-const double _cupertinoNavigationBarMaxTextScaleFactor = 1.235;
-
 bool get usesExpandedNavigationActions =>
     defaultTargetPlatform == TargetPlatform.android;
 
@@ -61,7 +58,13 @@ final class ScriptNavigationButton extends StatelessWidget {
         child: CupertinoButton(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.medium),
           onPressed: onPressed,
-          child: Transform.translate(offset: contentOffset, child: child),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: contentOffset.dx.abs(),
+              vertical: contentOffset.dy.abs(),
+            ),
+            child: Transform.translate(offset: contentOffset, child: child),
+          ),
         ),
       ),
     );
@@ -81,11 +84,7 @@ final class ScriptNavigationActionOverlay extends StatelessWidget {
         alignment: AlignmentDirectional.topEnd,
         child: Padding(
           padding: const EdgeInsetsDirectional.only(end: AppSpacing.large),
-          child: MediaQuery.withClampedTextScaling(
-            minScaleFactor: 1,
-            maxScaleFactor: _cupertinoNavigationBarMaxTextScaleFactor,
-            child: trailing,
-          ),
+          child: trailing,
         ),
       ),
     );

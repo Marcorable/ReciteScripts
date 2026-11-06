@@ -152,42 +152,94 @@ void main() {
     );
   });
 
-  testWidgets('Android 추가 버튼은 48 실제 터치 영역과 Semantics를 제공한다', (tester) async {
+  testWidgets('iOS와 Android 추가 버튼은 200% 배율과 접근성을 보존한다', (tester) async {
     final originalPlatform = debugDefaultTargetPlatformOverride;
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    final repository = _WidgetScriptRepository();
     final semantics = tester.ensureSemantics();
+    final scaledButtonRects = <TargetPlatform, Rect>{};
     try {
-      await tester.pumpWidget(_buildApp(repository));
-      await tester.pumpAndSettle();
+      for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+        debugDefaultTargetPlatformOverride = platform;
+        tester.platformDispatcher.textScaleFactorTestValue = 1;
+        await tester.pumpWidget(_buildApp(_WidgetScriptRepository()));
+        await tester.pumpAndSettle();
 
-      final listAddButton = find.byKey(const Key('script-list-add-button'));
-      final buttonRect = tester.getRect(listAddButton);
-      expect(buttonRect.width, greaterThanOrEqualTo(48));
-      expect(buttonRect.height, greaterThanOrEqualTo(48));
-      final addButtonSemantics = find.bySemanticsLabel('새 대본 추가');
-      expect(addButtonSemantics, findsOneWidget);
-      expect(
-        tester
-            .getSemantics(addButtonSemantics)
-            .getSemanticsData()
-            .hasAction(SemanticsAction.tap),
-        isTrue,
-      );
+        final addButton = find.byKey(const Key('script-list-add-button'));
+        final unscaledButtonRect = tester.getRect(addButton);
+        final unscaledLabelRect = tester.getRect(find.text('추가'));
 
-      final buttonRenderObject = tester.renderObject(listAddButton);
-      for (final position in [
-        buttonRect.topLeft + const Offset(1, 1),
-        buttonRect.bottomRight - const Offset(1, 1),
-      ]) {
-        final hitTest = tester.hitTestOnBinding(position);
+        await tester.pumpWidget(const SizedBox.shrink());
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        await tester.pumpWidget(_buildApp(_WidgetScriptRepository()));
+        await tester.pumpAndSettle();
+
+        final scaledButtonRect = tester.getRect(addButton);
+        final scaledLabelRect = tester.getRect(find.text('추가'));
+        scaledButtonRects[platform] = scaledButtonRect;
+
+        expect(tester.takeException(), isNull);
+        expect(scaledButtonRect.width, greaterThanOrEqualTo(48));
+        expect(scaledButtonRect.height, greaterThanOrEqualTo(48));
+        expect(scaledButtonRect.topRight, unscaledButtonRect.topRight);
         expect(
-          hitTest.path.any((entry) => entry.target == buttonRenderObject),
+          scaledLabelRect.width,
+          greaterThan(unscaledLabelRect.width * 1.8),
+        );
+        expect(
+          scaledLabelRect.height,
+          greaterThan(unscaledLabelRect.height * 1.8),
+        );
+        expect(scaledButtonRect.contains(scaledLabelRect.topLeft), isTrue);
+        expect(scaledButtonRect.contains(scaledLabelRect.bottomRight), isTrue);
+
+        final addButtonSemantics = find.bySemanticsLabel('새 대본 추가');
+        expect(addButtonSemantics, findsOneWidget);
+        expect(
+          tester
+              .getSemantics(addButtonSemantics)
+              .getSemanticsData()
+              .hasAction(SemanticsAction.tap),
           isTrue,
         );
-      }
 
-      await tester.tap(listAddButton);
+        final buttonRenderObject = tester.renderObject(addButton);
+        for (final position in [
+          scaledButtonRect.topLeft + const Offset(1, 1),
+          scaledButtonRect.bottomRight - const Offset(1, 1),
+        ]) {
+          final hitTest = tester.hitTestOnBinding(position);
+          expect(
+            hitTest.path.any((entry) => entry.target == buttonRenderObject),
+            isTrue,
+          );
+        }
+
+        await tester.tapAt(scaledButtonRect.bottomRight - const Offset(1, 1));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('script-title-field')), findsOneWidget);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    } finally {
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+      semantics.dispose();
+      debugDefaultTargetPlatformOverride = originalPlatform;
+    }
+
+    expect(
+      scaledButtonRects[TargetPlatform.android],
+      scaledButtonRects[TargetPlatform.iOS],
+    );
+  });
+
+  testWidgets('Android 추가 화면 내비게이션 조작의 터치 영역이 48 이상이다', (tester) async {
+    final originalPlatform = debugDefaultTargetPlatformOverride;
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(_buildApp(_WidgetScriptRepository()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('script-list-add-button')));
       await tester.pumpAndSettle();
       for (final key in [
         const Key('script-create-cancel-button'),
@@ -198,7 +250,6 @@ void main() {
         expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
       }
     } finally {
-      semantics.dispose();
       debugDefaultTargetPlatformOverride = originalPlatform;
     }
   });
