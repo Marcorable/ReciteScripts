@@ -166,6 +166,8 @@ void main() {
         final addButton = find.byKey(const Key('script-list-add-button'));
         final unscaledButtonRect = tester.getRect(addButton);
         final unscaledLabelRect = tester.getRect(find.text('추가'));
+        expect(unscaledButtonRect.width, greaterThanOrEqualTo(48));
+        expect(unscaledButtonRect.height, greaterThanOrEqualTo(48));
 
         await tester.pumpWidget(const SizedBox.shrink());
         tester.platformDispatcher.textScaleFactorTestValue = 2;
