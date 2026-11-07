@@ -92,62 +92,63 @@ final class _ScriptListViewState extends State<ScriptListView> {
       key: const Key('script-list-add-button'),
       semanticLabel: '새 대본 추가',
       onPressed: _openCreateView,
+      contentOffset: const Offset(
+        0,
+        -(AppTargets.preferred - kMinInteractiveDimensionCupertino) / 2,
+      ),
       child: const Text('추가'),
     );
-    final expandedActions = usesExpandedNavigationActions;
 
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.systemGroupedBackground,
-      child: AnimatedBuilder(
-        animation: widget.viewModel,
-        builder: (context, child) {
-          return CustomScrollView(
-            slivers: [
-              CupertinoSliverNavigationBar(
-                largeTitle: const Text('대본'),
-                trailing: expandedActions ? null : addButton,
-                bottom: expandedActions
-                    ? ScriptNavigationActionBar(trailing: addButton)
-                    : null,
-                bottomMode: expandedActions
-                    ? NavigationBarBottomMode.always
-                    : null,
-              ),
-              if (widget.viewModel.isLoading)
-                const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(child: CupertinoActivityIndicator()),
-                )
-              else if (widget.viewModel.hasLoadError)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: ScriptLoadError(onRetry: widget.viewModel.retry),
-                )
-              else if (widget.viewModel.scripts.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: ScriptEmptyState(onAdd: _openCreateView),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: AppSpacing.large,
-                  ),
-                  sliver: SliverList.builder(
-                    itemCount: widget.viewModel.scripts.length,
-                    itemBuilder: (context, index) {
-                      final script = widget.viewModel.scripts[index];
-                      return ScriptListTile(
-                        script: script,
-                        onSelected: () => _openReadingSetup(script),
-                        onDelete: () => _confirmDelete(script),
-                      );
-                    },
-                  ),
-                ),
-            ],
-          );
-        },
+      child: Stack(
+        children: [
+          AnimatedBuilder(
+            animation: widget.viewModel,
+            builder: (context, child) {
+              return CustomScrollView(
+                slivers: [
+                  const CupertinoSliverNavigationBar(largeTitle: Text('대본')),
+                  if (widget.viewModel.isLoading)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(child: CupertinoActivityIndicator()),
+                    )
+                  else if (widget.viewModel.hasLoadError)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: ScriptLoadError(onRetry: widget.viewModel.retry),
+                    )
+                  else if (widget.viewModel.scripts.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: ScriptEmptyState(onAdd: _openCreateView),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.large,
+                      ),
+                      sliver: SliverList.builder(
+                        itemCount: widget.viewModel.scripts.length,
+                        itemBuilder: (context, index) {
+                          final script = widget.viewModel.scripts[index];
+                          return ScriptListTile(
+                            script: script,
+                            onSelected: () => _openReadingSetup(script),
+                            onDelete: () => _confirmDelete(script),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          Positioned.fill(
+            child: ScriptNavigationActionOverlay(trailing: addButton),
+          ),
+        ],
       ),
     );
   }

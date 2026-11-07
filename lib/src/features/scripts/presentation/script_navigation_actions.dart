@@ -36,25 +36,55 @@ final class ScriptNavigationButton extends StatelessWidget {
     required this.semanticLabel,
     required this.onPressed,
     required this.child,
+    this.contentOffset = Offset.zero,
     super.key,
   });
 
   final String semanticLabel;
   final VoidCallback? onPressed;
   final Widget child;
+  final Offset contentOffset;
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: AppTargets.preferredConstraints,
-      child: CupertinoButton(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.medium),
-        onPressed: onPressed,
-        child: Semantics(
-          button: true,
-          label: semanticLabel,
-          excludeSemantics: true,
-          child: child,
+    return Semantics(
+      button: true,
+      enabled: onPressed != null,
+      label: semanticLabel,
+      onTap: onPressed,
+      excludeSemantics: true,
+      child: ConstrainedBox(
+        constraints: AppTargets.preferredConstraints,
+        child: CupertinoButton(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.medium),
+          onPressed: onPressed,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: contentOffset.dx.abs(),
+              vertical: contentOffset.dy.abs(),
+            ),
+            child: Transform.translate(offset: contentOffset, child: child),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final class ScriptNavigationActionOverlay extends StatelessWidget {
+  const ScriptNavigationActionOverlay({required this.trailing, super.key});
+
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      bottom: false,
+      child: Align(
+        alignment: AlignmentDirectional.topEnd,
+        child: Padding(
+          padding: const EdgeInsetsDirectional.only(end: AppSpacing.large),
+          child: trailing,
         ),
       ),
     );
